@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  GREETING: Hello, world!
+
+tasks:
+  build:
+    desc: Сборка приложения для тестов 68хх
+    cmds:
+      - go build -o ./tester ./cmd/hw68xx-test/main.go
+  
+  test:
+    desc: Прогон тестов. Запускать после каждого изменения
+    cmds:
+      - go test ./...
+  
+  lint:
+    desc: Запуск линтеров
+    cmds:
+      - golangci-lint run
+  
+  run:
+    desc: Сборк и запуск приложения с sudo
+    cmds:
+      - go build -o ./tester ./cmd/hw68xx-test/main.go
+      - sudo ./tester &
+  
+  clean:
+    desc: Чистка артефактов
+    cmds:
+      - rm ./tester
