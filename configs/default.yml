@@ -1,0 +1,29 @@
+config:
+  ram:
+    value_mb: 65536
+  rom:
+    nums: 4
+    value_mb_each: 1048576
+    min_read_v_mbs: 500
+    min_write_v_mbs: 500
+  ports:
+    ethernets:
+      - enp0s1
+      - enp0s2
+      - enp0s3
+      - enp0s4
+    com:
+      - /dev/ttyS0
+      - /dev/ttyS1
+  usb_flash:
+    mount_point: /mnt/usb
+    filename: test.txt
+  stress:
+    max_heat: 85
+    gradient: 40
+    duration: 10m
+  optional_flags:
+    ports: true
+    usb_flash: true
+    stress: true
+  

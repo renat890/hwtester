@@ -22,7 +22,7 @@ tasks:
       - golangci-lint run
   
   run:
-    desc: Сборк и запуск приложения с sudo
+    desc: Сборка и запуск приложения с sudo
     cmds:
       - go build -o ./tester ./cmd/hw68xx-test/main.go
       - sudo ./tester &
