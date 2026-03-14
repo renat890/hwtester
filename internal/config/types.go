@@ -3,43 +3,44 @@ package config
 import "time"
 
 type Config struct {
-	RAM           RAM
-	ROM           ROM
-	Ports         Ports
-	USBFlash      USBFlash
-	Stress        Stress
-	OptionalFlags OptionalFlags
+	RAM           RAM           `yaml:"ram"`
+	ROM           ROM           `yaml:"rom"`
+	Ports         Ports         `yaml:"ports"`
+	USBFlash      USBFlash      `yaml:"usb_flash"`
+	Stress        Stress        `yaml:"stress"`
+	OptionalFlags OptionalFlags `yaml:"optional_flags"`
 }
 
 type RAM struct {
-	ValueMB int
+	ValueMB int `yaml:"value_mb"`
 }
 
 type ROM struct {
-	Nums         int
-	ValueMBEach  int
-	MinReadVMBs  int
-	MinWriteVMBs int
+	Nums         int `yaml:"nums"`
+	ValueMBEach  int `yaml:"value_mb_each"`
+	MinReadVMBs  int `yaml:"min_read_v_mbs"`
+	MinWriteVMBs int `yaml:"min_write_v_mbs"`
 }
 
+// TODO: добавить значения по умолчанию
 type Ports struct {
-	Ethernets []string
-	COM       []string
+	Ethernets []string `yaml:"ethernets"`
+	COM       []string `yaml:"com"`
 }
 
 type USBFlash struct {
-	MountPoint string
-	Filename   string
+	MountPoint string `yaml:"mount_point"`
+	Filename   string `yaml:"filename"`
 }
 
 type Stress struct {
-	MaxHeat  int
-	Gradient int
-	Duration time.Time
+	MaxHeat  int           `yaml:"max_heat"`
+	Gradient int           `yaml:"gradient"`
+	Duration time.Duration `yaml:"duration"`
 }
 
 type OptionalFlags struct {
-	Ports    bool
-	USBFlash bool
-	Stress   bool
+	Ports    bool `yaml:"ports"`
+	USBFlash bool `yaml:"usb_flash"`
+	Stress   bool `yaml:"stress"`
 }
