@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-const threshold float64 = 0.02
-
 type MemGetter interface {
 	GetMemory() (int, error)
 }
@@ -28,13 +26,15 @@ func NewTestRAM(mg MemGetter, expectedMem int) *RAM {
 	}
 }
 
-func (r *RAM) Run(ctx context.Context) hw.TestResult {
+func (r *RAM) Run(ctx context.Context) (result hw.TestResult) {
+	const threshold float64 = 0.02
+
 	start := time.Now()
-	result := hw.TestResult{Name: r.name}
+	result = hw.TestResult{Name: r.name}
+	defer func ()  { result.Duration = time.Since(start) }()
 
 	actualMem, err := r.memGetter.GetMemory()
 	if err != nil {
-		result.Duration = time.Since(start)
 		result.Status = hw.Error
 		return result
 	}
@@ -51,14 +51,7 @@ func (r *RAM) Run(ctx context.Context) hw.TestResult {
 	result.Metrics["actual_mb"] = actualMem
 	result.Metrics["deviation_pct"] = math.Abs(float64(actualMem) / float64(r.expectedMB) * 100 - 100)
 
-	result.Duration = time.Since(start)
 	return result
-}
-
-func isPassValue(expected, actual int, threshold float64) bool {
-	minMb := float64(expected) * (1 - threshold)
-	maxMb := float64(expected) * (1 + threshold)
-	return float64(actual) >= minMb && float64(actual) <= maxMb
 }
 
 func (r *RAM) Name() string {
