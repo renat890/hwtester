@@ -6,13 +6,13 @@ import (
 )
 
 type Report struct {
-	Meta Meta
-	Results []hw.TestResult
-	FinalResult hw.Status
+	Meta        Meta            `json:"meta"`
+	Results     []hw.TestResult `json:"results"`
+	FinalResult hw.Status       `json:"final_results"`
 }
 
 type Meta struct {
-	Data time.Time
-	DeviceName string
-	VersionOS string
+	Date       time.Time `json:"date"`
+	DeviceName string    `json:"device_name"`
+	VersionOS  string    `json:"version_os"`
 }
