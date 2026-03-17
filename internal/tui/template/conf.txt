@@ -1,0 +1,16 @@
+RAM: Значение всего {{ .RAM.ValueMB }}
+ROM:
+    - Количество дисков {{ .ROM.Nums }}
+    - Объем каждого диска {{ .ROM.ValueMBEach }}
+    - Минимальная скорость чтения {{ .ROM.MinReadVMBs }}
+    - Минимальная скорость записи {{ .ROM.MinWriteVMBs }}
+Ports:
+    - Ethernet:{{ range .Ports.Ethernets }} {{ . }}{{ end }}
+    - COM:{{ range .Ports.COM }} {{ . }}{{ end }}
+USB Flash:
+    - Точка монтирования {{ .USBFlash.MountPoint }}
+    - Имя файла {{ .USBFlash.Filename }}
+Stress:
+    - Макс. нагрев {{ .Stress.MaxHeat }}
+    - Градиент {{ .Stress.Gradient }}
+    - Длительность {{ .Stress.Duration }}
