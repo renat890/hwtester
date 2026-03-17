@@ -1,6 +1,7 @@
 package report
 
 import (
+	"bytes"
 	"encoding/json"
 	"factorytest/internal/hw"
 	"testing"
@@ -82,6 +83,26 @@ func TestGenerate(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:     "есть error",
+			expected: hw.Fail,
+			results: []hw.TestResult{
+				{
+					Name:     "Тест ОЗУ",
+					Status:   hw.Pass,
+					Duration: time.Second.Round(time.Second),
+					Metrics: map[string]any{
+						"1": float64(2),
+					},
+				},
+				{
+					Name:     "Тест ПЗУ",
+					Status:   hw.Error,
+					Duration: time.Second.Round(time.Second),
+					Details: "ошибка получения ПЗУ",
+				},
+			},
+		},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
@@ -108,4 +129,43 @@ func TestGenerate(t *testing.T) {
 			assert.Equal(t, expected, reportTrip)
 		})
 	}
+}
+
+func TestWriteJSON(t *testing.T) {
+	expected := Report{
+		Meta: Meta{
+			Date:       time.Now().Round(0),
+			DeviceName: "ARIS 6820",
+			VersionOS:  "1.8.1",
+		},
+		Results: []hw.TestResult{
+			{
+				Name:     "Тест ОЗУ",
+				Status:   hw.Pass,
+				Duration: time.Second.Round(time.Second),
+				Metrics: map[string]any{
+					"1": float64(2),
+				},
+			},
+			{
+				Name:     "Тест ПЗУ",
+				Status:   hw.Pass,
+				Duration: time.Second.Round(time.Second),
+				Metrics: map[string]any{
+					"1": float64(2),
+				},
+			},
+		},
+		FinalResult: hw.Pass,
+	}
+
+
+
+	var buffer bytes.Buffer
+	err := WriteJSON(&buffer, expected)
+	assert.NoError(t, err)
+	var actualReport Report
+	err = json.Unmarshal(buffer.Bytes(), &actualReport)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, actualReport)
 }
