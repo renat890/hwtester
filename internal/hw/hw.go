@@ -20,9 +20,9 @@ type HWTest interface {
 }
 
 type TestResult struct {
-	Name     string
-	Status   Status // Pass / Fail / Skip / Error
-	Duration time.Duration
-	Details  string
-	Metrics  map[string]any // произвольные метрики для отчёта
+	Name     string `json:"name"`
+	Status   Status `json:"status"` // Pass / Fail / Skip / Error
+	Duration time.Duration `json:"duration"`
+	Details  string `json:"details"`
+	Metrics  map[string]any `json:"metrics"` // произвольные метрики для отчёта
 }
