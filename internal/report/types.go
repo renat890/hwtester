@@ -8,7 +8,7 @@ import (
 type Report struct {
 	Meta        Meta            `json:"meta"`
 	Results     []hw.TestResult `json:"results"`
-	FinalResult hw.Status       `json:"final_results"`
+	FinalResult hw.Status       `json:"final_result"`
 }
 
 type Meta struct {
