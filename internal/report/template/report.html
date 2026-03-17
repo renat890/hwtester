@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Report — {{ .Meta.DeviceName }}</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Source+Serif+4:wght@400;600&display=swap");
+
+      :root {
+        --bg: #0e1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --text-dim: #8b949e;
+        --pass: #3fb950;
+        --fail: #f85149;
+        --skip: #d29922;
+        --error: #f778ba;
+        --accent: #58a6ff;
+      }
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Source Serif 4", Georgia, serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        padding: 2rem;
+      }
+
+      .container {
+        max-width: 960px;
+        margin: 0 auto;
+      }
+
+      /* ── Header ── */
+      header {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 1.5rem;
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      h1 {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .meta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        text-align: right;
+        line-height: 1.8;
+      }
+
+      .meta span {
+        display: block;
+      }
+
+      /* ── Final result badge ── */
+      .final-result {
+        display: inline-block;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0.35rem 1rem;
+        border-radius: 4px;
+        margin-bottom: 2rem;
+      }
+
+      /* ── Status colours ── */
+      .status-pass {
+        color: var(--pass);
+        border: 1px solid var(--pass);
+      }
+      .status-fail {
+        color: var(--fail);
+        border: 1px solid var(--fail);
+      }
+      .status-skip {
+        color: var(--skip);
+        border: 1px solid var(--skip);
+      }
+      .status-error {
+        color: var(--error);
+        border: 1px solid var(--error);
+      }
+
+      .status-pass.filled {
+        background: color-mix(in srgb, var(--pass) 15%, transparent);
+      }
+      .status-fail.filled {
+        background: color-mix(in srgb, var(--fail) 15%, transparent);
+      }
+      .status-skip.filled {
+        background: color-mix(in srgb, var(--skip) 15%, transparent);
+      }
+      .status-error.filled {
+        background: color-mix(in srgb, var(--error) 15%, transparent);
+      }
+
+      /* ── Summary bar ── */
+      .summary-bar {
+        display: flex;
+        gap: 1.5rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        margin-bottom: 2rem;
+      }
+
+      .summary-bar strong {
+        color: var(--text);
+      }
+
+      /* ── Table ── */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+
+      thead th {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-dim);
+        text-align: left;
+        padding: 0.6rem 0.8rem;
+        border-bottom: 2px solid var(--border);
+      }
+
+      tbody td {
+        padding: 0.7rem 0.8rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+
+      tbody tr:hover {
+        background: var(--surface);
+      }
+
+      .col-name {
+        width: 28%;
+        font-weight: 600;
+      }
+      .col-status {
+        width: 8%;
+        text-align: center;
+      }
+      .col-duration {
+        width: 10%;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.8rem;
+      }
+      .col-details {
+        width: 34%;
+        color: var(--text-dim);
+        font-size: 0.85rem;
+      }
+      .col-metrics {
+        width: 20%;
+      }
+
+      .status-dot {
+        display: inline-block;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.15rem 0.5rem;
+        border-radius: 3px;
+      }
+
+      /* ── Metrics ── */
+      .metrics-list {
+        list-style: none;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+      }
+
+      .metrics-list li + li {
+        margin-top: 0.2rem;
+      }
+
+      .metrics-key {
+        color: var(--accent);
+      }
+
+      .metrics-val {
+        color: var(--text);
+      }
+
+      /* ── Empty / no-data ── */
+      .empty {
+        color: var(--text-dim);
+        font-style: italic;
+        font-size: 0.8rem;
+      }
+
+      /* ── Footer ── */
+      footer {
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.7rem;
+        color: var(--text-dim);
+        text-align: right;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- ── Header ── -->
+      <header>
+        <h1>Test Report</h1>
+        <div class="meta">
+          <span>{{ .Meta.DeviceName }} · {{ .Meta.VersionOS }}</span>
+          <span>{{ formatDate .Meta.Date "02-01-2006 15:04:05" }}</span>
+        </div>
+      </header>
+
+      <!-- ── Final result ── -->
+      {{- $fc := "pass" }} {{- if eq .FinalResult "Fail" }}{{ $fc = "fail" }}{{
+      end }} {{- if eq .FinalResult "Skip" }}{{ $fc = "skip" }}{{ end }} {{- if
+      eq .FinalResult "Error" }}{{ $fc = "error" }}{{ end }}
+      <div class="final-result filled status-{{ $fc }}">
+        Result: {{ .FinalResult }}
+      </div>
+
+      <!-- ── Summary counters ── -->
+      {{- $pass := 0 }}{{ $fail := 0 }}{{ $skip := 0 }}{{ $errn := 0 }} {{-
+      range .Results }} {{- if eq .Status "Pass" }}{{ $pass = add $pass 1 }}{{
+      end }} {{- if eq .Status "Fail" }}{{ $fail = add $fail 1 }}{{ end }} {{-
+      if eq .Status "Skip" }}{{ $skip = add $skip 1 }}{{ end }} {{- if eq
+      .Status "Error" }}{{ $errn = add $errn 1 }}{{ end }} {{- end }}
+      <div class="summary-bar">
+        <span>Total: <strong>{{ len .Results }}</strong></span>
+        <span class="status-pass">Pass: <strong>{{ $pass }}</strong></span>
+        <span class="status-fail">Fail: <strong>{{ $fail }}</strong></span>
+        <span class="status-skip">Skip: <strong>{{ $skip }}</strong></span>
+        <span class="status-error">Error: <strong>{{ $errn }}</strong></span>
+      </div>
+
+      <!-- ── Results table ── -->
+      <table>
+        <thead>
+          <tr>
+            <th class="col-name">Test</th>
+            <th class="col-status">Status</th>
+            <th class="col-duration">Duration</th>
+            <th class="col-details">Details</th>
+            <th class="col-metrics">Metrics</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{- range .Results }} {{- $sc := "pass" }} {{- if eq .Status "Fail"
+          }}{{ $sc = "fail" }}{{ end }} {{- if eq .Status "Skip" }}{{ $sc =
+          "skip" }}{{ end }} {{- if eq .Status "Error" }}{{ $sc = "error" }}{{
+          end }}
+          <tr>
+            <td class="col-name">{{ .Name }}</td>
+            <td class="col-status">
+              <span class="status-dot filled status-{{ $sc }}"
+                >{{ .Status }}</span
+              >
+            </td>
+            <td class="col-duration">{{ .Duration }}</td>
+            <td class="col-details">
+              {{- if .Details }}{{ .Details }}{{ else }}<span class="empty"
+                >—</span
+              >{{ end }}
+            </td>
+            <td class="col-metrics">
+              {{- if .Metrics }}
+              <ul class="metrics-list">
+                {{- range $k, $v := .Metrics }}
+                <li>
+                  <span class="metrics-key">{{ $k }}</span>:
+                  <span class="metrics-val">{{ $v }}</span>
+                </li>
+                {{- end }}
+              </ul>
+              {{- else }}<span class="empty">—</span>{{ end }}
+            </td>
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+
+      <footer>generated by hw-check</footer>
+    </div>
+  </body>
+</html>

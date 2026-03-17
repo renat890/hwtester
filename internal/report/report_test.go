@@ -159,8 +159,6 @@ func TestWriteJSON(t *testing.T) {
 		FinalResult: hw.Pass,
 	}
 
-
-
 	var buffer bytes.Buffer
 	err := WriteJSON(&buffer, expected)
 	assert.NoError(t, err)
@@ -168,4 +166,51 @@ func TestWriteJSON(t *testing.T) {
 	err = json.Unmarshal(buffer.Bytes(), &actualReport)
 	assert.NoError(t, err)
 	assert.Equal(t, expected, actualReport)
+}
+
+func TestWriteHTML(t *testing.T) {
+	report := Report{
+		Meta: Meta{
+			Date:       time.Now().Round(0),
+			DeviceName: "ARIS 6820",
+			VersionOS:  "1.8.1",
+		},
+		Results: []hw.TestResult{
+			{
+				Name:     "Тест ОЗУ",
+				Status:   hw.Pass,
+				Duration: time.Second.Round(time.Second),
+				Metrics: map[string]any{
+					"1": float64(2),
+				},
+			},
+			{
+				Name:     "Тест ПЗУ",
+				Status:   hw.Error,
+				Duration: time.Second.Round(time.Second),
+				Details: "тут ошибка",
+			},
+		},
+		FinalResult: hw.Fail,
+	}
+
+	var buffer bytes.Buffer
+	err := WriteHTML(&buffer, report)
+	assert.NoError(t, err)
+	bodyStr := buffer.String()
+
+	expectedFields := []string{
+		report.Meta.Date.Format("02-01-2006 15:04:05"),
+		report.Meta.DeviceName, report.Meta.VersionOS,
+		report.Results[0].Name, string(report.Results[0].Status),
+		report.Results[1].Name, string(report.Results[1].Status),
+		report.Results[1].Details,
+	}
+
+
+	for _, val := range expectedFields {
+		t.Run(val, func(t *testing.T) {
+			assert.Contains(t, bodyStr, val)
+		})
+	}
 }
