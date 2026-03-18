@@ -52,12 +52,17 @@ type ModelRunner interface {
 	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult) []hw.TestResult
 }
 
-func NewModel(cfg config.Config, mRunner ModelRunner) Model {
+func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest) Model {
 	return Model{
 		currentScreen: startScreen,
 		cfg: cfg,
 		mRunner: mRunner,
+		tests: tests,
 	}
+}
+
+func (m Model) Results() []hw.TestResult {
+	return m.results
 }
 
 func (m Model) Init() tea.Cmd {
@@ -71,6 +76,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			return m, tea.Quit
 		case "enter":
+			if m.currentScreen == resultScreen {
+				return m, tea.Quit
+			}
 			m.currentScreen = runScreen
 			m.ch = make(chan hw.TestResult)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -84,6 +92,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cancel != nil {
 				m.cancel()
 			}
+			if m.ch != nil {
+				go func ()  { for range m.ch {}	}()
+			}
+			
 			m.currentScreen = resultScreen
 			return m, nil
 		}
@@ -125,9 +137,7 @@ func (m Model) View() tea.View {
 	case resultScreen:
 		s.Reset()
 		s.WriteString("Результаты тестирования:\n")
-		for _, val := range m.results {
-			s.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, val.Status))
-		}
+		s.WriteString(genResultString(m.results))
 		s.WriteString(fmt.Sprintf("Общий результат: %s\n", m.final))
 	}
 
@@ -143,25 +153,34 @@ func genConfString(cfg config.Config) string {
 	return buffer.String()
 }
 
+func genResultString(items []hw.TestResult) string {
+	var buffer bytes.Buffer
+	if err := tmplConf.ExecuteTemplate(&buffer, "result.txt", items); err != nil {
+		return "не удалось создать текст результатов " + err.Error()
+	}
+
+	return buffer.String()
+}
+
 func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {
 	return func() tea.Msg {
 		result, ok := <- ch
-	if !ok {
-		final := hw.Pass
+		if !ok {
+			final := hw.Pass
 
-		for _, val := range m.results {
-			if val.Status == hw.Error || val.Status == hw.Fail {
-				final = hw.Fail
-				break
+			for _, val := range m.results {
+				if val.Status == hw.Error || val.Status == hw.Fail {
+					final = hw.Fail
+					break
+				}
+			}
+
+			return AllDoneMsg{
+				Results: m.results,
+				Final: final,
 			}
 		}
 
-		return AllDoneMsg{
-			Results: m.results,
-			Final: final,
-		}
-	}
-
-	return TestDoneMsg{Result: result}
+		return TestDoneMsg{Result: result}
 	}
 }
