@@ -1,8 +1,8 @@
 ram:
-  value_mb: 65536
+  value_mb: 163840
 rom:
-  nums: 4
-  value_mb_each: 1048576
+  nums: 1
+  value_mb_each: 2024000
   min_read_v_mbs: 500
   min_write_v_mbs: 500
 ports:
