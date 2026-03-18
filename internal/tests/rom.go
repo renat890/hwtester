@@ -32,9 +32,10 @@ func NewTestRom(dg DisksGetter, conf config.ROM) *ROM {
 }
 
 func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
-	const threshold float64 = 0.0
+	// обусловлено, что вычилсяется приближенно
+	const threshold float64 = 0.01
 	start := time.Now()
-	result = hw.TestResult{Name: r.name}
+	result = hw.TestResult{Name: r.name, Status: hw.Pass}
 
 	defer func() { result.Duration = time.Since(start) }()
 
@@ -48,7 +49,6 @@ func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
 	if nums := len(actualDisks); nums != r.conf.Nums {
 		result.Status = hw.Fail
 		result.Details = fmt.Sprintf("В системе установлено %d дисков, а должно быть %d дисков", nums, r.conf.Nums )
-		return result
 	}
 
 	for _, disk := range actualDisks {
@@ -57,13 +57,11 @@ func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
 		}
 		result.Status = hw.Fail
 		result.Details = fmt.Sprintf("Для диска %s объем %d, а должно быть %d", disk.Name, disk.VolumeMB, r.conf.ValueMBEach )
-		return result
 	}
 
 	result.Metrics = map[string]any{}
 	result.Metrics["nums_disks"] = len(actualDisks)
 	result.Metrics["volume_each_disk"] = r.conf.ValueMBEach
-	result.Status = hw.Pass
 	return result
 }
 
