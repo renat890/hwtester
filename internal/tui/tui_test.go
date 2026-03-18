@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"context"
 	"factorytest/internal/config"
+	"factorytest/internal/hw"
 	"strconv"
 	"testing"
 	"time"
@@ -9,6 +11,26 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 )
+
+// ============= мок =============
+
+type mockRunner struct {
+	results []hw.TestResult
+}
+
+func (m mockRunner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult) []hw.TestResult {
+	for _, val := range m.results {
+		if ctx.Err() != nil {
+			return m.results
+		} else {
+			ch <- val
+		}
+	}
+
+	return m.results
+}
+
+// ============= тесты ===========
 
 var cfg = config.Config{
 	RAM: config.RAM{
@@ -40,7 +62,7 @@ var cfg = config.Config{
 	}}
 
 func TestTui(t *testing.T) {
-	m := NewModel(cfg)
+	m := NewModel(cfg, mockRunner{})
 	assert.Equal(t, startScreen, m.currentScreen)
 
 	button := tea.KeyPressMsg{
@@ -53,7 +75,7 @@ func TestTui(t *testing.T) {
 }
 
 func TestView(t *testing.T) {
-	m := NewModel(cfg)
+	m := NewModel(cfg, mockRunner{})
 	assert.Equal(t, startScreen, m.currentScreen)
 	var v tea.View = m.View()
 	assert.Contains(t, v.Content, strconv.Itoa(cfg.RAM.ValueMB))
@@ -65,7 +87,7 @@ func TestView(t *testing.T) {
 }
 
 func TestQuit(t *testing.T) {
-	m := NewModel(cfg)
+	m := NewModel(cfg, mockRunner{})
 	button := tea.KeyPressMsg{
 		Code: 'q',
 	}
@@ -76,3 +98,52 @@ func TestQuit(t *testing.T) {
 	assert.True(t, ok)
 }
 
+func TestOneRun(t *testing.T) {
+	m := NewModel(cfg, mockRunner{})
+	assert.Equal(t, startScreen, m.currentScreen)
+
+	button := tea.KeyPressMsg{
+		Code: tea.KeyEnter,
+	}
+	newModel, _ := m.Update(button)
+	updated := newModel.(Model)
+	assert.Equal(t, runScreen, updated.currentScreen)
+
+	newModel, _ = updated.Update(TestDoneMsg{Result: hw.TestResult{Status: hw.Pass, Name: "проверка ОЗУ"}})
+	updated = newModel.(Model)
+
+	var v tea.View = updated.View()
+	assert.Contains(t, v.Content, string(hw.Pass))
+	assert.Contains(t, v.Content, "проверка ОЗУ")
+	assert.Equal(t, runScreen, updated.currentScreen)
+}
+
+func TestAll(t *testing.T) {
+	m := NewModel(cfg, mockRunner{})
+	assert.Equal(t, startScreen, m.currentScreen)
+
+	button := tea.KeyPressMsg{
+		Code: tea.KeyEnter,
+	}
+	newModel, _ := m.Update(button)
+	updated := newModel.(Model)
+	assert.Equal(t, runScreen, updated.currentScreen)
+
+	newModel, _ = updated.Update(AllDoneMsg{
+		Results: []hw.TestResult{
+			{Name: "Mock1", Status: hw.Pass},
+			{Name: "Mock2", Status: hw.Fail},
+			{Name: "Mock3", Status: hw.Pass},
+		},
+		Final: hw.Fail,
+	})
+	updated = newModel.(Model)
+	assert.Equal(t, resultScreen, updated.currentScreen)
+
+	var v tea.View = updated.View()
+	assert.Contains(t, v.Content, string(hw.Pass))
+	assert.Contains(t, v.Content, "Mock1")
+	assert.Contains(t, v.Content, string(hw.Fail))
+	assert.Contains(t, v.Content, "Mock2")
+	assert.Contains(t, v.Content, "Mock3")
+}

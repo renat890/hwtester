@@ -2,8 +2,11 @@ package tui
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"factorytest/internal/config"
+	"factorytest/internal/hw"
+	"fmt"
 	"strings"
 	"text/template"
 
@@ -23,15 +26,37 @@ const (
 	resultScreen
 )
 
+type TestDoneMsg struct {
+	Result hw.TestResult
+}
+
+type AllDoneMsg struct {
+	Results []hw.TestResult
+	Final hw.Status
+}
+
+
 type Model struct {
 	currentScreen screen
 	cfg config.Config
+	mRunner ModelRunner
+	ch chan hw.TestResult
+	results []hw.TestResult
+	cancel context.CancelFunc
+	final hw.Status
+
+	tests []hw.HWTest
 }
 
-func NewModel(cfg config.Config) Model {
+type ModelRunner interface {
+	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult) []hw.TestResult
+}
+
+func NewModel(cfg config.Config, mRunner ModelRunner) Model {
 	return Model{
 		currentScreen: startScreen,
 		cfg: cfg,
+		mRunner: mRunner,
 	}
 }
 
@@ -43,12 +68,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "q":
 			return m, tea.Quit
 		case "enter":
 			m.currentScreen = runScreen
+			m.ch = make(chan hw.TestResult)
+			ctx, cancel := context.WithCancel(context.Background())
+			m.cancel = cancel
+			go func ()  {
+				m.mRunner.Run(ctx, m.tests, m.ch)
+				close(m.ch)
+			}()
+			return m, m.waitForResult(m.ch)
+		case "ctrl+c":
+			if m.cancel != nil {
+				m.cancel()
+			}
+			m.currentScreen = resultScreen
+			return m, nil
 		}
+	case TestDoneMsg:
+		m.results = append(m.results, msg.Result)
+		return m, m.waitForResult(m.ch)
+	case AllDoneMsg:
+		m.currentScreen = resultScreen
+		m.final = msg.Final
+		m.results = msg.Results
+		return m, nil
 	}
+
 	return m, nil
 }
 
@@ -57,6 +105,7 @@ func (m Model) View() tea.View {
 
 	switch m.currentScreen {
 	case startScreen:
+		s.Reset()
 		s.WriteString("Тестирование 68хх по следующим пунктам:\n\n")
 		tests := []string{"ОЗУ", "ПЗУ", "Порты COM", "Порты Ethernet",
 		"Порты USB", "Стресс-тестирование (система охлаждения)"}
@@ -67,6 +116,19 @@ func (m Model) View() tea.View {
 		s.WriteByte(byte('\n'))
 		s.WriteString("Параметры для тестирования:\n")
 		s.WriteString(genConfString(m.cfg))
+	case runScreen:
+		s.Reset()
+		s.WriteString("Ход тестирования 68хх:\n\n")
+		for _, val := range m.results {
+			s.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, val.Status))
+		}
+	case resultScreen:
+		s.Reset()
+		s.WriteString("Результаты тестирования:\n")
+		for _, val := range m.results {
+			s.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, val.Status))
+		}
+		s.WriteString(fmt.Sprintf("Общий результат: %s\n", m.final))
 	}
 
 	return tea.NewView(s.String())
@@ -81,3 +143,25 @@ func genConfString(cfg config.Config) string {
 	return buffer.String()
 }
 
+func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {
+	return func() tea.Msg {
+		result, ok := <- ch
+	if !ok {
+		final := hw.Pass
+
+		for _, val := range m.results {
+			if val.Status == hw.Error || val.Status == hw.Fail {
+				final = hw.Fail
+				break
+			}
+		}
+
+		return AllDoneMsg{
+			Results: m.results,
+			Final: final,
+		}
+	}
+
+	return TestDoneMsg{Result: result}
+	}
+}
