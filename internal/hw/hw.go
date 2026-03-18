@@ -26,3 +26,5 @@ type TestResult struct {
 	Details  string `json:"details"`
 	Metrics  map[string]any `json:"metrics"` // произвольные метрики для отчёта
 }
+
+

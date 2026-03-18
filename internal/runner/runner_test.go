@@ -61,7 +61,7 @@ func TestRun(t *testing.T) {
 			defer cancel()
 
 			runner := NewTestRunner()
-			result := runner.Run(ctx, tC.tests)
+			result := runner.Run(ctx, tC.tests, make(chan hw.TestResult, 4))
 			assert.Equal(t, tC.expected, result)
 		})
 	}
@@ -83,7 +83,7 @@ func TestRunWithCancel(t *testing.T) {
 
 	t.Run("отмена контекста для теста", func(t *testing.T) {
 		runner := NewTestRunner()
-		result := runner.Run(ctx, tests)
+		result := runner.Run(ctx, tests, make(chan hw.TestResult, 4))
 		assert.Equal(t, expected, result)
 	})
 }

@@ -11,7 +11,7 @@ func NewTestRunner() *runner {
 	return &runner{}
 }
 
-func (r *runner) Run(ctx context.Context, tests []hw.HWTest) []hw.TestResult {
+func (r *runner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult) []hw.TestResult {
 	result := []hw.TestResult{}
 
 	for _, test := range tests {
@@ -20,8 +20,9 @@ func (r *runner) Run(ctx context.Context, tests []hw.HWTest) []hw.TestResult {
 			testResult = hw.TestResult{Name: test.Name(), Status: hw.Skip}
 		} else {
 			testResult = test.Run(ctx)
+			
 		}
-		
+		ch <- testResult
 		result = append(result, testResult)
 	}
 
