@@ -33,6 +33,8 @@ func NewTestRom(dg DisksGetter, conf config.ROM) *ROM {
 	}
 }
 
+// TODO: на подумать. result.details - возможно стоит превратить в массив string,
+// если не требуется останавливать тесты и проверить вообще всё
 func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
 	// обусловлено, что вычилсяется приближенно
 	const threshold float64 = 0.01
@@ -54,11 +56,19 @@ func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
 	}
 
 	for _, disk := range actualDisks {
-		if isPassValue(r.conf.ValueMBEach, disk.VolumeMB, threshold) {
-			continue
+		if !isPassValue(r.conf.ValueMBEach, disk.VolumeMB, threshold) {
+			result.Details = fmt.Sprintf("Для диска %s объем %d, а должно быть %d", disk.Name, disk.VolumeMB, r.conf.ValueMBEach)
+			result.Status = hw.Fail
 		}
-		result.Status = hw.Fail
-		result.Details = fmt.Sprintf("Для диска %s объем %d, а должно быть %d", disk.Name, disk.VolumeMB, r.conf.ValueMBEach)
+		if disk.ReadMBPerSec < r.conf.MinReadVMBs {
+			result.Details = fmt.Sprintf("Для диска %s скорость чтения %d, а должно быть больше %d", disk.Name, disk.ReadMBPerSec, r.conf.MinReadVMBs)
+			result.Status = hw.Fail
+		}
+
+		if disk.WriteMBPerSec < r.conf.MinWriteVMBs {
+			result.Details = fmt.Sprintf("Для диска %s скорость записи %d, а должно быть больше %d", disk.Name, disk.WriteMBPerSec, r.conf.MinWriteVMBs)
+			result.Status = hw.Fail
+		}
 	}
 
 	result.Metrics = map[string]any{}

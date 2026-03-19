@@ -68,7 +68,7 @@ func TestTui(t *testing.T) {
 	button := tea.KeyPressMsg{
 		Code: tea.KeyEnter,
 	}
-	
+
 	newModel, _ := m.Update(button)
 	updated := newModel.(Model)
 	assert.Equal(t, runScreen, updated.currentScreen)
