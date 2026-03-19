@@ -1,60 +1,126 @@
 package main
 
 import (
-	"encoding/json"
-	"factorytest/internal/tests"
+	"context"
+	"errors"
+	"fmt"
 	"log"
-	"math"
-	"os/exec"
+	"runtime"
+	"slices"
 	"strings"
+	"time"
+
+	"github.com/shirou/gopsutil/v4/sensors"
 )
 
-type output struct {
-	BlockDevices []device `json:"blockdevices"`
-}
-
-type device struct {
-	Name string `json:"name"`
-	Size uint64    `json:"size"`
-
-}
-
-func bytesToMBytes(bytes uint64) int {
-	return int(float64(bytes) / math.Pow(2, 20) * 1.049)
-}
+var ErrSensorsNotFound = errors.New("датчики температуры coretemp не найдены")
 
 func main() {
-	const nvme = "lsblk -d -b -n -N -o NAME,SIZE -J"
-	const scsi = "lsblk -d -b -n -S -o NAME,SIZE -J"
-	const virt = "lsblk -d -b -n -v -o NAME,SIZE -J"
+	dur := 60 * time.Second
+	maxTemp := 85.0
+	gradient := 40.0
+	freq := 5 * time.Second
+	ch := make(chan []sensors.TemperatureStat)
 
-	disks := []tests.DiskInfo{}
+	log.Println("Запущен нагружатор")
+	infoT, err := sensors.SensorsTemperatures()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	startTmp, err := getCoreTemp(infoT)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	log.Printf("Стартовая температура: %f", startTmp)
+	ctx, cancel := context.WithTimeout(context.Background(), dur)
+	defer cancel()
 
-	for _, cmd := range []string{nvme,scsi,virt} {
-		args := strings.Split(cmd, " ")
-		cmdC := args[0]
-		cmdA := args[1:]
+	go getTemperature(ctx, freq, ch)
 
-		cmd := exec.Command(cmdC,  cmdA...)
-		out, err := cmd.Output()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		var o output
-		err = json.Unmarshal(out, &o)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		for _, info := range o.BlockDevices {
-			disks = append(disks, tests.DiskInfo{
-				Name: info.Name,
-				VolumeMB: int(info.Size),
-			})
-		}
-
+	for num := range runtime.NumCPU() {
+		go load(ctx, num)
 	}
 
-	log.Println(disks)
+	temperatures := []float64{}
+
+	for val := range ch {
+		temp, err := getCoreTemp(val)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("температура в текущий момент: %f", temp)
+		temperatures = append(temperatures, temp)
+	}
+	
+	maxT := slices.Max(temperatures)
+
+	fmt.Printf("максимальная температура: %f\n", maxT)
+	fmt.Printf("Превышен порог: %t\n", maxT > maxTemp)
+	fmt.Printf("Превышен градиент: %t\n", (maxT - startTmp) > gradient)
+}
+
+
+func load(ctx context.Context, worker int) {
+	log.Printf("Запущен worker с номером - %d\n", worker)
+	workLoad:
+	for {
+		select {
+		case <- ctx.Done():
+			break workLoad
+		default:
+			i := 1
+			_ = i + 1
+		}
+	}
+	log.Printf("Остановлен worker с номером - %d", worker)
+}
+
+func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat) {
+	log.Println("Запущен сборщик показаний температуры")
+	attempt := 1
+	getter:
+	for {
+		select {
+		case <- ctx.Done():
+			close(ch)
+			break getter
+		default:
+			info, err := sensors.SensorsTemperatures()
+			if err != nil {
+				log.Printf("ошибка опроса датчика температуры, попытка №%d\n", attempt)
+				attempt++
+				continue
+			} 
+			ch <- info 
+		}
+		time.Sleep(freq)
+	}
+	log.Println("Остановлен сборщик показаний температуры")
+}
+
+func getCoreTemp(info []sensors.TemperatureStat) (float64, error) {
+	const corePattern = "coretemp"
+	if len(info) == 0 {
+		return 0, fmt.Errorf("пустой список")
+	}
+	maxTemp := 0.0
+	for _, temp := range info {
+		if !strings.Contains(temp.SensorKey, corePattern) {
+			continue
+		}
+		if temp.Temperature > maxTemp {
+			maxTemp = temp.Temperature
+		}
+	}
+
+	if maxTemp == 0 {
+		return 0, ErrSensorsNotFound
+	}
+
+	// перевод в Цельсий, так как температура в фаренгейтах
+	return farToCels(maxTemp), nil
+}
+
+func farToCels(farTemp float64) float64 {
+	return (farTemp - 32) * (5.0 / 9.0)
 }
