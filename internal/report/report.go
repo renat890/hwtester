@@ -52,7 +52,7 @@ func WriteJSON(w io.Writer, r Report) error {
 
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"formatDate": func (t time.Time, a string) string {
+		"formatDate": func(t time.Time, a string) string {
 			return t.Format(a)
 		},
 		"add": func(a, b int) int { return a + b },

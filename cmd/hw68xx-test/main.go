@@ -36,19 +36,19 @@ func main() {
 	model = modelR.(tui.Model)
 	// TODO: пока заглушка, в будущем должна программа создавать
 	meta := report.Meta{
-		Date: time.Now(),
+		Date:       time.Now(),
 		DeviceName: "68xx",
-		VersionOS: "1",
+		VersionOS:  "1",
 	}
 	rep := report.Generate(meta, model.Results())
 
-	htmlFile, err := os.OpenFile("report.html", os.O_CREATE | os.O_RDWR, 0644)
+	htmlFile, err := os.OpenFile("report.html", os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Printf("не удалось открыть файл для записи %v", err)
 	}
 	defer htmlFile.Close()
 
-	jsonFile, err := os.OpenFile("report.json", os.O_CREATE | os.O_RDWR, 0644)
+	jsonFile, err := os.OpenFile("report.json", os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		log.Printf("не удалось открыть файл для записи %v", err)
 	}

@@ -5,7 +5,7 @@ import (
 	"factorytest/internal/hw"
 )
 
-type runner struct {}
+type runner struct{}
 
 func NewTestRunner() *runner {
 	return &runner{}
@@ -20,7 +20,7 @@ func (r *runner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResu
 			testResult = hw.TestResult{Name: test.Name(), Status: hw.Skip}
 		} else {
 			testResult = test.Run(ctx)
-			
+
 		}
 		ch <- testResult
 		result = append(result, testResult)
@@ -28,4 +28,3 @@ func (r *runner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResu
 
 	return result
 }
-

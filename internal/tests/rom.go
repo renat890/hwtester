@@ -9,8 +9,10 @@ import (
 )
 
 type DiskInfo struct {
-	Name string
-	VolumeMB int
+	Name          string
+	VolumeMB      int
+	WriteMBPerSec int
+	ReadMBPerSec  int
 }
 
 type DisksGetter interface {
@@ -19,14 +21,14 @@ type DisksGetter interface {
 
 type ROM struct {
 	name string
-	dg DisksGetter
+	dg   DisksGetter
 	conf config.ROM
 }
 
 func NewTestRom(dg DisksGetter, conf config.ROM) *ROM {
 	return &ROM{
 		name: "Тест ПЗУ",
-		dg: dg,
+		dg:   dg,
 		conf: conf,
 	}
 }
@@ -48,7 +50,7 @@ func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
 
 	if nums := len(actualDisks); nums != r.conf.Nums {
 		result.Status = hw.Fail
-		result.Details = fmt.Sprintf("В системе установлено %d дисков, а должно быть %d дисков", nums, r.conf.Nums )
+		result.Details = fmt.Sprintf("В системе установлено %d дисков, а должно быть %d дисков", nums, r.conf.Nums)
 	}
 
 	for _, disk := range actualDisks {
@@ -56,7 +58,7 @@ func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
 			continue
 		}
 		result.Status = hw.Fail
-		result.Details = fmt.Sprintf("Для диска %s объем %d, а должно быть %d", disk.Name, disk.VolumeMB, r.conf.ValueMBEach )
+		result.Details = fmt.Sprintf("Для диска %s объем %d, а должно быть %d", disk.Name, disk.VolumeMB, r.conf.ValueMBEach)
 	}
 
 	result.Metrics = map[string]any{}
@@ -64,7 +66,6 @@ func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
 	result.Metrics["volume_each_disk"] = r.conf.ValueMBEach
 	return result
 }
-
 
 func (r *ROM) Name() string {
 	return r.name

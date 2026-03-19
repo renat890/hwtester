@@ -11,17 +11,16 @@ import (
 // ============= мок тестов ==============
 
 type MockTest struct {
-	name string
+	name   string
 	status hw.Status
 	cancel context.CancelFunc
-
 }
 
-func(m MockTest) Name() string {
+func (m MockTest) Name() string {
 	return m.name
 }
 
-func(m MockTest) Run(ctx context.Context) hw.TestResult {
+func (m MockTest) Run(ctx context.Context) hw.TestResult {
 	if m.cancel != nil {
 		m.cancel()
 	}
@@ -32,9 +31,9 @@ func(m MockTest) Run(ctx context.Context) hw.TestResult {
 
 func TestRun(t *testing.T) {
 	testCases := []struct {
-		desc	 string
+		desc     string
 		expected []hw.TestResult
-		tests	 []hw.HWTest
+		tests    []hw.HWTest
 	}{
 		{
 			desc: "тестов 3",
@@ -50,9 +49,9 @@ func TestRun(t *testing.T) {
 			},
 		},
 		{
-			desc: "пустой список тестов",
+			desc:     "пустой список тестов",
 			expected: []hw.TestResult{},
-			tests: []hw.HWTest{},
+			tests:    []hw.HWTest{},
 		},
 	}
 	for _, tC := range testCases {

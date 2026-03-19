@@ -32,18 +32,17 @@ type TestDoneMsg struct {
 
 type AllDoneMsg struct {
 	Results []hw.TestResult
-	Final hw.Status
+	Final   hw.Status
 }
-
 
 type Model struct {
 	currentScreen screen
-	cfg config.Config
-	mRunner ModelRunner
-	ch chan hw.TestResult
-	results []hw.TestResult
-	cancel context.CancelFunc
-	final hw.Status
+	cfg           config.Config
+	mRunner       ModelRunner
+	ch            chan hw.TestResult
+	results       []hw.TestResult
+	cancel        context.CancelFunc
+	final         hw.Status
 
 	tests []hw.HWTest
 }
@@ -55,9 +54,9 @@ type ModelRunner interface {
 func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest) Model {
 	return Model{
 		currentScreen: startScreen,
-		cfg: cfg,
-		mRunner: mRunner,
-		tests: tests,
+		cfg:           cfg,
+		mRunner:       mRunner,
+		tests:         tests,
 	}
 }
 
@@ -83,7 +82,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ch = make(chan hw.TestResult)
 			ctx, cancel := context.WithCancel(context.Background())
 			m.cancel = cancel
-			go func ()  {
+			go func() {
 				m.mRunner.Run(ctx, m.tests, m.ch)
 				close(m.ch)
 			}()
@@ -93,9 +92,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cancel()
 			}
 			if m.ch != nil {
-				go func ()  { for range m.ch {}	}()
+				go func() {
+					for range m.ch {
+					}
+				}()
 			}
-			
+
 			m.currentScreen = resultScreen
 			return m, nil
 		}
@@ -120,7 +122,7 @@ func (m Model) View() tea.View {
 		s.Reset()
 		s.WriteString("Тестирование 68хх по следующим пунктам:\n\n")
 		tests := []string{"ОЗУ", "ПЗУ", "Порты COM", "Порты Ethernet",
-		"Порты USB", "Стресс-тестирование (система охлаждения)"}
+			"Порты USB", "Стресс-тестирование (система охлаждения)"}
 		for _, val := range tests {
 			s.WriteString(val)
 			s.WriteByte(byte('\n'))
@@ -164,7 +166,7 @@ func genResultString(items []hw.TestResult) string {
 
 func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {
 	return func() tea.Msg {
-		result, ok := <- ch
+		result, ok := <-ch
 		if !ok {
 			final := hw.Pass
 
@@ -177,7 +179,7 @@ func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {
 
 			return AllDoneMsg{
 				Results: m.results,
-				Final: final,
+				Final:   final,
 			}
 		}
 

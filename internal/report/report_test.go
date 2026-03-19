@@ -99,7 +99,7 @@ func TestGenerate(t *testing.T) {
 					Name:     "Тест ПЗУ",
 					Status:   hw.Error,
 					Duration: time.Second.Round(time.Second),
-					Details: "ошибка получения ПЗУ",
+					Details:  "ошибка получения ПЗУ",
 				},
 			},
 		},
@@ -188,7 +188,7 @@ func TestWriteHTML(t *testing.T) {
 				Name:     "Тест ПЗУ",
 				Status:   hw.Error,
 				Duration: time.Second.Round(time.Second),
-				Details: "тут ошибка",
+				Details:  "тут ошибка",
 			},
 		},
 		FinalResult: hw.Fail,
@@ -206,7 +206,6 @@ func TestWriteHTML(t *testing.T) {
 		report.Results[1].Name, string(report.Results[1].Status),
 		report.Results[1].Details,
 	}
-
 
 	for _, val := range expectedFields {
 		t.Run(val, func(t *testing.T) {
