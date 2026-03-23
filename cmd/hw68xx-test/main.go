@@ -25,6 +25,7 @@ func main() {
 	hwTests := []hw.HWTest{
 		tests.NewTestRAM(&impl, cfg.RAM.ValueMB),
 		tests.NewTestRom(&impl, cfg.ROM),
+		tests.NewTestCPU(&impl, cfg.Stress),
 	}
 
 	r := runner.NewTestRunner()
