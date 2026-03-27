@@ -2,125 +2,147 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
-	"runtime"
-	"slices"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/shirou/gopsutil/v4/sensors"
+	"go.bug.st/serial"
 )
 
-var ErrSensorsNotFound = errors.New("датчики температуры coretemp не найдены")
+const msg = "test com this big message and very big message abracodabra stop"
 
 func main() {
-	dur := 60 * time.Second
-	maxTemp := 85.0
-	gradient := 40.0
-	freq := 5 * time.Second
-	ch := make(chan []sensors.TemperatureStat)
-
-	log.Println("Запущен нагружатор")
-	infoT, err := sensors.SensorsTemperatures()
+	ports, err := serial.GetPortsList()
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal(err)
 	}
-	startTmp, err := getCoreTemp(infoT)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	log.Printf("Стартовая температура: %f", startTmp)
-	ctx, cancel := context.WithTimeout(context.Background(), dur)
-	defer cancel()
-
-	go getTemperature(ctx, freq, ch)
-
-	for num := range runtime.NumCPU() {
-		go load(ctx, num)
+	for _, port := range ports {
+		log.Printf("Найден порт: %v\n", port)
 	}
 
-	temperatures := []float64{}
+	pairs := map[string]string{
+		ports[0]: ports[1],
+		ports[1]: ports[0],
+	}
 
-	for val := range ch {
-		temp, err := getCoreTemp(val)
-		if err != nil {
-			log.Fatal(err)
+	var wg sync.WaitGroup
+	result := make(chan bool, 1)
+	defer close(result)
+
+	var tests bool
+	testsAttempt := 3
+
+	for i := range testsAttempt {
+		tests = true
+		ctx, cancel := context.WithTimeout(context.Background(), 2 * time.Second)
+
+		log.Printf("%d попытка прохождения теста с COM-портами\n", i+1)
+		for rPort, wPort := range pairs {
+			log.Printf("Тестирование пары rPort %s, wPort %s\n", rPort, wPort)
+			wg.Add(2)
+			go func(r string)  {
+				defer wg.Done()
+				portRead(ctx, r, result)
+			}(rPort)
+			go func(w string) {
+				defer wg.Done()
+				portWrite(ctx, w)
+			}(wPort) 
+			wg.Wait()
+
+			res, ok := <- result
+			if !ok || !res {
+				tests = false
+			}
 		}
-		log.Printf("температура в текущий момент: %f", temp)
-		temperatures = append(temperatures, temp)
+		cancel()
+		if tests {
+			break
+		} else {
+			log.Println("Неудачная попытка прохождения теста. Перезапускаю тест.")
+		}
+	}
+
+	if tests {
+		log.Println("Тест пройден")
+	} else {
+		log.Println("Тест не пройден")
 	}
 	
-	maxT := slices.Max(temperatures)
-
-	fmt.Printf("максимальная температура: %f\n", maxT)
-	fmt.Printf("Превышен порог: %t\n", maxT > maxTemp)
-	fmt.Printf("Превышен градиент: %t\n", (maxT - startTmp) > gradient)
 }
 
-
-func load(ctx context.Context, worker int) {
-	log.Printf("Запущен worker с номером - %d\n", worker)
-	workLoad:
-	for {
-		select {
-		case <- ctx.Done():
-			break workLoad
-		default:
-			i := 1
-			_ = i + 1
-		}
+func portRead(ctx context.Context, name string, ch chan bool) {
+	port, err := serial.Open(name, &serial.Mode{
+		BaudRate: 115200,
+	})
+	if err != nil {
+		log.Println(err)
+		ch <- false
+		return
 	}
-	log.Printf("Остановлен worker с номером - %d", worker)
-}
+	defer port.Close()
 
-func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat) {
-	log.Println("Запущен сборщик показаний температуры")
-	attempt := 1
-	getter:
+	if err := port.SetReadTimeout(500 * time.Millisecond); err !=  nil {
+		log.Println(err)
+		ch <- false
+		return
+	}
+
+	if err := port.ResetInputBuffer(); err != nil {
+		log.Println(err)
+		ch <- false
+		return
+	}
+
+	var final strings.Builder
+	buf := make([]byte, 8)
+	numMsg := 1 
+	log.Printf("Запущен порт читатель rPort %s\n", name)
+	reader:
 	for {
 		select {
 		case <- ctx.Done():
-			close(ch)
-			break getter
+			ch <- false
+			return
 		default:
-			info, err := sensors.SensorsTemperatures()
+			n, err := port.Read(buf)
 			if err != nil {
-				log.Printf("ошибка опроса датчика температуры, попытка №%d\n", attempt)
-				attempt++
+				log.Printf("Ошибка чтения из COM-порта: %s\n", err.Error())
+			}
+			numMsg++
+			if n == 0 {
 				continue
-			} 
-			ch <- info 
+			}
+			// log.Printf("Получено сообщение #%d: %s\n",numMsg, string(buf[:n]))
+			final.WriteString(string(buf[:n]))
+			if strings.Contains(final.String(), "stop") {
+				break reader
+			}
 		}
-		time.Sleep(freq)
 	}
-	log.Println("Остановлен сборщик показаний температуры")
+	if msg == final.String() {
+		ch <- true	
+	} else {
+		ch <- false
+	}
 }
 
-func getCoreTemp(info []sensors.TemperatureStat) (float64, error) {
-	const corePattern = "coretemp"
-	if len(info) == 0 {
-		return 0, fmt.Errorf("пустой список")
+func portWrite(ctx context.Context, name string) {
+	port, err := serial.Open(name, &serial.Mode{
+		BaudRate: 115200,
+	})
+	if err != nil {
+		log.Println(err)
+		return
 	}
-	maxTemp := 0.0
-	for _, temp := range info {
-		if !strings.Contains(temp.SensorKey, corePattern) {
-			continue
-		}
-		if temp.Temperature > maxTemp {
-			maxTemp = temp.Temperature
-		}
+	defer port.Close()
+	log.Printf("Запущен порт писатель wPort %s\n", name)
+	if ctx.Err() != nil {
+		return
 	}
-
-	if maxTemp == 0 {
-		return 0, ErrSensorsNotFound
+	_, err = port.Write(([]byte(msg)))
+	if err != nil {
+		log.Printf("Ошибка записи в COM-порт: %s\n", err.Error())
 	}
-
-	// перевод в Цельсий, так как температура в фаренгейтах
-	return farToCels(maxTemp), nil
-}
-
-func farToCels(farTemp float64) float64 {
-	return (farTemp - 32) * (5.0 / 9.0)
 }
