@@ -25,6 +25,7 @@ type ROM struct {
 // TODO: добавить значения по умолчанию
 type Ports struct {
 	Ethernets []string `yaml:"ethernets"`
+	PacketsLoss int    `yaml:"packets_loss"`
 	COM       []string `yaml:"com"`
 }
 

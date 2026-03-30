@@ -11,6 +11,7 @@ ports:
     - enp0s2
     - enp0s3
     - enp0s4
+  packets_loss: 0
   com:
     - /dev/ttyS0
     - /dev/ttyS1

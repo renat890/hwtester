@@ -20,6 +20,7 @@ var validConf = Config{
 	Ports: Ports{
 		Ethernets: []string{"enp0s2", "enp0s1", "enp0s3", "enp0s4"},
 		COM:       []string{"/dev/ttyS0", "/dev/ttyS1"},
+		PacketsLoss: 0,
 	},
 	USBFlash: USBFlash{
 		MountPoint: "/mnt/usb",
