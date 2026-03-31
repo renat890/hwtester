@@ -147,7 +147,7 @@ type USBTest struct {
 }
 
 type GetterUSBInfo interface {
-	GetUSBInfo(ctx context.Context, filename, mountpoint string) (USBInfo, error)
+	GetUSBInfo(ctx context.Context) (USBInfo, error)
 }
 
 func NewUSBTest(getterUSBInfo GetterUSBInfo, conf config.USBFlash) *USBTest {
@@ -165,7 +165,7 @@ func (u *USBTest) Run(ctx context.Context) (result hw.TestResult) {
 	}()
 	result.Name = u.Name()
 
-	usbInfo, err := u.ui.GetUSBInfo(ctx, u.conf.Filename, u.conf.MountPoint)
+	usbInfo, err := u.ui.GetUSBInfo(ctx)
 	if err != nil {
 		result.Status = hw.Error
 		result.Details = err.Error()

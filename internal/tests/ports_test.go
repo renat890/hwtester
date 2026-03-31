@@ -122,7 +122,7 @@ type mockUSBInfo struct {
 	err error
 }
 
-func (m *mockUSBInfo) GetUSBInfo(ctx context.Context, filename, mountpoint string) (USBInfo, error) {
+func (m *mockUSBInfo) GetUSBInfo(ctx context.Context) (USBInfo, error) {
 	return m.ui, m.err
 }
 

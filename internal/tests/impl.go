@@ -354,7 +354,7 @@ func getAvgTemp(info []sensors.TemperatureStat) (float64, error) {
 // для COM портов
 const msg = "test com this big message and very big message abracodabra stop"
 
-func EchoTest(ctx context.Context) (COMInfo, error) {
+func (h *HardwareUsage) EchoTest(ctx context.Context) (COMInfo, error) {
 	ports, err := serial.GetPortsList()
 	if err != nil {
 		return COMInfo{}, errors.New("Не удалось получить COM порты")
@@ -362,7 +362,9 @@ func EchoTest(ctx context.Context) (COMInfo, error) {
 	for _, port := range ports {
 		log.Printf("Найден порт: %v\n", port)
 	}
-
+	if len(ports) < 2 {
+		return COMInfo{}, errors.New("нет минимального количества портов COM")
+	}
 	// Обусловлено выбором /dev/ttyS0 и /dev/ttyS1
 	pairs := map[string]string{
 		ports[0]: ports[1],
@@ -407,7 +409,7 @@ func EchoTest(ctx context.Context) (COMInfo, error) {
 		}
 	}
 
-	final := COMInfo{Result: false}
+	final := COMInfo{Result: false, TestPorts: ports}
 	if tests {
 		final.Result = true
 	} 
@@ -489,12 +491,13 @@ func portWrite(ctx context.Context, name string) {
 }
 
 // для работы с флешками
-func GetUSBInfo(ctx context.Context) (USBInfo, error) {
+func (h *HardwareUsage) GetUSBInfo(ctx context.Context) (USBInfo, error) {
 	// TODO: вынести в конфигурационный файл размер флешки
 	const sizeInMB int = 8000
 	disks, err := scsiDevices()
+	// TODO: добавить детальное описание ошибок
 	if err != nil {
-		log.Panic(err)
+		return USBInfo{}, err
 	}
 	diskNames := make([]string, 0)
 	for _, val := range disks {
@@ -505,27 +508,27 @@ func GetUSBInfo(ctx context.Context) (USBInfo, error) {
 		}
 	}
 
-	for _, val := range diskNames {
-		fmt.Println(val)
-	}
-
 	const testFileName = "test.txt"
 	actual := 0
 	for _, diskName := range diskNames {
 		disk, err := diskfs.Open(diskName)
 		if err != nil {
-			log.Panic(err)
+			log.Println(err)
+			continue
 		}
-
 
 		fs, err := disk.GetFilesystem(1)
 		if err != nil {
-			log.Panic(err)
+			log.Println(err)
+			disk.Close()
+			continue
 		}
 
 		b, err := fs.ReadFile(testFileName)
 		if err != nil {
 			log.Println("Не удалось прочитать файл")
+			disk.Close()
+			continue
 		}
 		// TODO: вынести в конфигурационный файл ожидаемое содержимое
 		const expectedString = "is opened testing file"
