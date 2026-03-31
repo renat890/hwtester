@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/diskfs/go-diskfs"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/sensors"
@@ -485,4 +486,88 @@ func portWrite(ctx context.Context, name string) {
 	if err != nil {
 		log.Printf("Ошибка записи в COM-порт: %s\n", err.Error())
 	}
+}
+
+// для работы с флешками
+func GetUSBInfo(ctx context.Context) (USBInfo, error) {
+	// TODO: вынести в конфигурационный файл размер флешки
+	const sizeInMB int = 8000
+	disks, err := scsiDevices()
+	if err != nil {
+		log.Panic(err)
+	}
+	diskNames := make([]string, 0)
+	for _, val := range disks {
+		isValidSize := math.Abs(float64(sizeInMB - val.VolumeMB)) < float64(sizeInMB / 100 * 2)
+		if isValidSize {
+			name := "/dev/" + strings.TrimSpace(val.Name)
+			diskNames = append(diskNames, name)
+		}
+	}
+
+	for _, val := range diskNames {
+		fmt.Println(val)
+	}
+
+	const testFileName = "test.txt"
+	actual := 0
+	for _, diskName := range diskNames {
+		disk, err := diskfs.Open(diskName)
+		if err != nil {
+			log.Panic(err)
+		}
+
+
+		fs, err := disk.GetFilesystem(1)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		b, err := fs.ReadFile(testFileName)
+		if err != nil {
+			log.Println("Не удалось прочитать файл")
+		}
+		// TODO: вынести в конфигурационный файл ожидаемое содержимое
+		const expectedString = "is opened testing file"
+		// убираем спецсимвол в конце строки
+		a,_,_ := strings.Cut(string(b), "\n")
+		if a == expectedString {
+			actual++
+		}
+
+		if err = disk.Close(); err != nil {
+			log.Printf("ошибка закрытия флешки: %s\n", err.Error())
+		}
+	}
+
+	if len(diskNames) != actual {
+		return USBInfo{Result: false}, nil
+	}
+
+	return USBInfo{Result: true}, nil
+}
+
+func scsiDevices() ([]DiskInfo, error) {
+	
+	cmd := exec.Command("lsblk", strings.Split("-d -b -n -S -o NAME,SIZE -J", " ")...)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var o output
+	err = json.Unmarshal(out, &o)
+	if err != nil {
+		return nil, err
+	}
+	disks := make([]DiskInfo, 0, 4)
+
+	for _, info := range o.BlockDevices {
+		disks = append(disks, DiskInfo{
+			Name:     info.Name,
+			VolumeMB: bytesToMBytes(info.Size),
+		})
+	}
+
+	return disks, nil
 }

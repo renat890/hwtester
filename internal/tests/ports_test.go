@@ -126,8 +126,6 @@ func (m *mockUSBInfo) GetUSBInfo(ctx context.Context, filename, mountpoint strin
 	return m.ui, m.err
 }
 
-
-
 var confUSB = config.USBFlash{
 	MountPoint: "/mnt/usb",
 	Filename: "test.txt",
