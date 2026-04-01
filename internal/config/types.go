@@ -31,7 +31,8 @@ type Ports struct {
 
 type Ethernet struct {
 	Name string     `yaml:"name"`
-	Address string `yaml:"address"`
+	Ip string `yaml:"ip"`
+	Port string `yaml:"port"`
 }
 
 type USBFlash struct {

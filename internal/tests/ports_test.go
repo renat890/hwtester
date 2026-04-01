@@ -23,8 +23,8 @@ func (m *mockCOMTest) EchoTest(ctx context.Context) (COMInfo, error) {
 var confPorts = config.Ports{
 	COM: []string{"/dev/ttyS0", "/dev/ttyS1"},
 	Ethernets: []config.Ethernet{
-			{Name: "eth0", Address: "192.168.0.101:8765"},
-            {Name: "eth1", Address: "192.168.0.102:8765"},
+			{Name: "eth0", Ip: "192.168.0.101", Port: "8765"},
+            {Name: "eth1", Ip: "192.168.0.102", Port: "8765"},
 		},
 	PacketsLoss: 0,
 }
