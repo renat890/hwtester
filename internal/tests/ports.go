@@ -113,7 +113,12 @@ func (e *EthernetsTest) Run(ctx context.Context) (result hw.TestResult) {
 		return
 	}
 
-	for _, port := range e.conf.Ethernets {
+	reqPorts := make([]string, len(e.conf.Ethernets))
+	for i := range e.conf.Ethernets {
+		reqPorts[i] = e.conf.Ethernets[i].Name
+	}
+
+	for _, port := range reqPorts {
 		if !slices.Contains(ethernetsInfo.Ports, port) {
 			result.Status = hw.Fail
 			result.Details = "Нет обязательных портов в системе"

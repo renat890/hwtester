@@ -7,10 +7,14 @@ rom:
   min_write_v_mbs: 500
 ports:
   ethernets:
-    - enp0s2
-    - enp0s1
-    - enp0s3
-    - enp0s4
+    - name: enp1s0
+      address: 192.168.0.101:8765
+    - name: enp2s0
+      address: 192.168.0.102:8765
+    - name: enp3s0
+      address: 193.168.0.101:8765
+    - name: enp4s0
+      address: 193.168.0.101:8765
   com:
     - /dev/ttyS0
     - /dev/ttyS1

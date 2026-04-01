@@ -24,9 +24,14 @@ type ROM struct {
 
 // TODO: добавить значения по умолчанию
 type Ports struct {
-	Ethernets []string `yaml:"ethernets"`
+	Ethernets []Ethernet `yaml:"ethernets"`
 	PacketsLoss int    `yaml:"packets_loss"`
 	COM       []string `yaml:"com"`
+}
+
+type Ethernet struct {
+	Name string     `yaml:"name"`
+	Address string `yaml:"address"`
 }
 
 type USBFlash struct {

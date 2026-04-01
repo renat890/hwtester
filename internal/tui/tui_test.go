@@ -43,7 +43,12 @@ var cfg = config.Config{
 		MinWriteVMBs: 500,
 	},
 	Ports: config.Ports{
-		Ethernets: []string{"enp0s2", "enp0s1", "enp0s3", "enp0s4"},
+		Ethernets: []config.Ethernet{
+			{Name: "enp1s0", Address: "192.168.0.101:8765"},
+            {Name: "enp2s0", Address: "192.168.0.102:8765"},
+            {Name: "enp3s0", Address: "193.168.0.101:8765"},
+            {Name: "enp4s0", Address: "193.168.0.101:8765"},
+		},
 		COM:       []string{"/dev/ttyS0", "/dev/ttyS1"},
 	},
 	USBFlash: config.USBFlash{
