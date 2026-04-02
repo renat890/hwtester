@@ -17,7 +17,7 @@ ports:
       ip: 193.168.0.101
       port: 8765
     - name: enp4s0
-      ip: 193.168.0.101
+      ip: 193.168.0.102
       port: 8765
   com:
     - /dev/ttyS0
