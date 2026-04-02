@@ -7,6 +7,7 @@ import (
 	"factorytest/internal/runner"
 	"factorytest/internal/tests"
 	"factorytest/internal/tui"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -16,8 +17,15 @@ import (
 )
 
 func main() {
+	if os.Getuid() != 0 {
+		log.Fatal("программа должна быть запущена с правами суперпользователя")
+	}
+	
+	cfgPath := flag.String("config", "./default.yml", "path to config file in .yml format")
+	flag.Parse()
+
 	fmt.Fprint(os.Stdout, "hello, factory test!\n")
-	cfg, err := config.Load("/home/renat/code/hwtester/configs/default.yml")
+	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		log.Fatalf("Не удалось загрузить конфигурацию: %s\n", err)
 	}
@@ -26,6 +34,9 @@ func main() {
 		tests.NewTestRAM(&impl, cfg.RAM.ValueMB),
 		tests.NewTestRom(&impl, cfg.ROM),
 		tests.NewTestCPU(&impl, cfg.Stress),
+		tests.NewEthernetsTest(&impl, cfg.Ports),
+		tests.NewTestCOM(&impl, cfg.Ports),
+		tests.NewUSBTest(&impl, cfg.USBFlash),
 	}
 
 	r := runner.NewTestRunner()
@@ -43,24 +54,29 @@ func main() {
 	}
 	rep := report.Generate(meta, model.Results())
 
-	htmlFile, err := os.OpenFile("report.html", os.O_CREATE|os.O_RDWR, 0644)
+	htmlFile, err := os.OpenFile("report.html", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		log.Printf("не удалось открыть файл для записи %v", err)
 	}
 	defer htmlFile.Close()
 
-	jsonFile, err := os.OpenFile("report.json", os.O_CREATE|os.O_RDWR, 0644)
+	jsonFile, err := os.OpenFile("report.json", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		log.Printf("не удалось открыть файл для записи %v", err)
 	}
 	defer jsonFile.Close()
 
-	err = report.WriteHTML(htmlFile, rep)
-	if err != nil {
-		log.Printf("не удалось записать данные в файл: %v", err)
+	if htmlFile != nil {
+		err = report.WriteHTML(htmlFile, rep)
+		if err != nil {
+			log.Printf("не удалось записать данные в файл: %v", err)
+		}
 	}
-	err = report.WriteJSON(jsonFile, rep)
-	if err != nil {
-		log.Printf("не удалось записать данные в файл: %v", err)
+	
+	if jsonFile != nil {
+		err = report.WriteJSON(jsonFile, rep)
+		if err != nil {
+			log.Printf("не удалось записать данные в файл: %v", err)
+		}
 	}
 }
