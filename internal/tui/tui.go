@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 //go:embed template/*.txt
@@ -120,7 +121,10 @@ func (m Model) View() tea.View {
 	switch m.currentScreen {
 	case startScreen:
 		s.Reset()
+		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
+		s.WriteByte(byte('\n'))
 		s.WriteString("Тестирование 68хх по следующим пунктам:\n\n")
+
 		tests := []string{"ОЗУ", "ПЗУ", "Порты COM", "Порты Ethernet",
 			"Порты USB", "Стресс-тестирование (система охлаждения)"}
 		for _, val := range tests {
@@ -132,18 +136,35 @@ func (m Model) View() tea.View {
 		s.WriteString(genConfString(m.cfg))
 	case runScreen:
 		s.Reset()
-		s.WriteString("Ход тестирования 68хх:\n\n")
+		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
+		s.WriteByte(byte('\n'))
+
+		logField := "Здесь будут логи"
+		var tmplBuilder strings.Builder
+
+		tmplBuilder.WriteString("Ход тестирования 68хх:\n\n")
 		for _, val := range m.results {
-			s.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, val.Status))
+			tmplBuilder.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, styledStatus(val.Status)))
 		}
+
+		// объединение в 2 столбца
+		s.WriteString(lipgloss.JoinHorizontal(lipgloss.Center, tmplBuilder.String(), logField))
 	case resultScreen:
 		s.Reset()
+		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
+		s.WriteByte(byte('\n'))
+
 		s.WriteString("Результаты тестирования:\n")
 		s.WriteString(genResultString(m.results))
-		s.WriteString(fmt.Sprintf("Общий результат: %s\n", m.final))
+		s.WriteString(fmt.Sprintf("Общий результат: %s\n", styledStatus(m.final)))
 	}
 
-	return tea.NewView(s.String())
+	v := tea.NewView(s.String())
+	// Полный экран и цвет другой для текста
+	v.AltScreen = true
+	v.ForegroundColor = lipgloss.Color(defaultColor)
+
+	return v
 }
 
 func genConfString(cfg config.Config) string {
@@ -155,9 +176,29 @@ func genConfString(cfg config.Config) string {
 	return buffer.String()
 }
 
+func styledStatus(status hw.Status) hw.Status {
+	var newStatus string
+	switch status {
+	case hw.Pass:
+		newStatus = passStyle.Render(string(hw.Pass))
+	case hw.Error:
+		newStatus = errorStyle.Render(string(hw.Error))
+	case hw.Fail:
+		newStatus = failStyle.Render(string(hw.Fail))
+	}
+	return hw.Status(newStatus)
+}
+
 func genResultString(items []hw.TestResult) string {
 	var buffer bytes.Buffer
-	if err := tmplConf.ExecuteTemplate(&buffer, "result.txt", items); err != nil {
+	itemsCopy := make([]hw.TestResult, len(items))
+	copy(itemsCopy, items)
+	// делаю результаты разных цветов
+	for i := range itemsCopy {
+		itemsCopy[i].Status = styledStatus(itemsCopy[i].Status )
+	}
+
+	if err := tmplConf.ExecuteTemplate(&buffer, "result.txt", itemsCopy); err != nil {
 		return "не удалось создать текст результатов " + err.Error()
 	}
 
