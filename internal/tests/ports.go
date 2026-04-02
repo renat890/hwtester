@@ -40,7 +40,7 @@ func NewTestCOM(getterComInfo GetterCOMInfo, conf config.Ports) *COMTest {
 	}
 }
 
-func (c *COMTest) Run(ctx context.Context) (result hw.TestResult) {
+func (c *COMTest) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
 	start := time.Now()
 	defer func(){
 		result.Duration = time.Since(start)
@@ -99,7 +99,7 @@ func NewEthernetsTest(getterEthernetsInfo GetterEthernetsInfo, conf config.Ports
 	}
 }
 
-func (e *EthernetsTest) Run(ctx context.Context) (result hw.TestResult) {
+func (e *EthernetsTest) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
 	start := time.Now()
 	defer func ()  {
 		result.Duration = time.Since(start)
@@ -163,7 +163,7 @@ func NewUSBTest(getterUSBInfo GetterUSBInfo, conf config.USBFlash) *USBTest {
 	}
 }
 
-func (u *USBTest) Run(ctx context.Context) (result hw.TestResult) {
+func (u *USBTest) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
 	start := time.Now()
 	defer func ()  {
 		result.Duration = time.Since(start)

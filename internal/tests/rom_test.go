@@ -87,7 +87,7 @@ func TestRom(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			testROM := NewTestRom(&mockRom{disks: tC.disks}, conf)
-			actual := testROM.Run(ctx)
+			actual := testROM.Run(ctx, make(chan string))
 			assert.Equal(t, tC.expected, actual.Status)
 			assert.NotZero(t, actual.Duration)
 		})
@@ -99,6 +99,6 @@ func TestRomError(t *testing.T) {
 	defer cancel()
 
 	testROM := NewTestRom(&mockRom{err: errors.New("hardware error")}, conf)
-	actual := testROM.Run(ctx)
+	actual := testROM.Run(ctx, make(chan string))
 	assert.Equal(t, hw.Error, actual.Status)
 }

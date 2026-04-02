@@ -201,7 +201,7 @@ func toMbPerSec(bytes int, nanoSec int64) float64 {
 	return mb / sec
 }
 
-func (h *HardwareUsage) Load(ctx context.Context, dur time.Duration) (CpuInfo, error) {
+func (h *HardwareUsage) Load(ctx context.Context, dur time.Duration, logCh chan string) (CpuInfo, error) {
 	ch := make(chan []sensors.TemperatureStat)
 
 	infoT, err := sensors.SensorsTemperatures()
@@ -217,10 +217,10 @@ func (h *HardwareUsage) Load(ctx context.Context, dur time.Duration) (CpuInfo, e
 	defer cancel()
 
 	freq := 5 * time.Second
-	go getTemperature(ctx1, freq, ch)
+	go getTemperature(ctx1, freq, ch, logCh)
 
 	for num := range runtime.NumCPU() {
-		go load(ctx1, num)
+		go load(ctx1, num, logCh)
 	}
 
 	temperatures := []float64{}
@@ -269,8 +269,8 @@ func getCpuName() string {
 	return info[0].ModelName
 }
 
-func load(ctx context.Context, worker int) {
-	log.Printf("Запущен worker с номером - %d\n", worker)
+func load(ctx context.Context, worker int, logCh chan string) {
+	logCh <- fmt.Sprintf("Запущен worker с номером - %d\n", worker)
 	var i int64
 	workLoad:
 	for {
@@ -284,11 +284,11 @@ func load(ctx context.Context, worker int) {
 			}
 		}
 	}
-	log.Printf("Остановлен worker с номером - %d", worker)
+	logCh <- fmt.Sprintf("Остановлен worker с номером - %d\n", worker)
 }
 
-func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat) {
-	log.Println("Запущен сборщик показаний температуры")
+func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat, logCh chan string) {
+	logCh <- fmt.Sprintln("Запущен сборщик показаний температуры")
 	attempt := 1
 	getter:
 	for {
@@ -299,7 +299,7 @@ func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.T
 		default:
 			info, err := sensors.SensorsTemperatures()
 			if err != nil {
-				log.Printf("ошибка опроса датчика температуры, попытка №%d\n", attempt)
+				logCh <- fmt.Sprintf("ошибка опроса датчика температуры, попытка №%d\n", attempt)
 				attempt++
 				continue
 			} 
@@ -307,7 +307,7 @@ func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.T
 		}
 		time.Sleep(freq)
 	}
-	log.Println("Остановлен сборщик показаний температуры")
+	logCh <- fmt.Sprintln("Остановлен сборщик показаний температуры")
 }
 
 const corePattern = "coretemp"

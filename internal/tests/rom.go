@@ -35,7 +35,7 @@ func NewTestRom(dg DisksGetter, conf config.ROM) *ROM {
 
 // TODO: на подумать. result.details - возможно стоит превратить в массив string,
 // если не требуется останавливать тесты и проверить вообще всё
-func (r *ROM) Run(ctx context.Context) (result hw.TestResult) {
+func (r *ROM) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
 	// обусловлено, что вычилсяется приближенно
 	const threshold float64 = 0.01
 	start := time.Now()

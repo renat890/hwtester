@@ -18,7 +18,7 @@ type mockCpuTest struct {
 	err error
 }
 
-func (m *mockCpuTest) Load(ctx context.Context, dur time.Duration) (CpuInfo, error) {
+func (m *mockCpuTest) Load(ctx context.Context, dur time.Duration, logCh chan string) (CpuInfo, error) {
 	return m.info, m.err
 }
 
@@ -75,7 +75,7 @@ func TestStressCPU(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			testCPU := NewTestCPU(&mockCpuTest{info: tC.info}, cfg)
-			var result hw.TestResult = testCPU.Run(ctx)
+			var result hw.TestResult = testCPU.Run(ctx, make(chan string))
 			assert.Equal(t, tC.expected, result.Status)
 		})
 	}
@@ -86,6 +86,6 @@ func TestStressCPUError(t *testing.T) {
 	defer cancel()
 
 	testCPU := NewTestCPU(&mockCpuTest{err: errors.New("hardware error")}, cfg)
-	var result hw.TestResult = testCPU.Run(ctx)
+	var result hw.TestResult = testCPU.Run(ctx, make(chan string))
 	assert.Equal(t, hw.Error, result.Status)
 }

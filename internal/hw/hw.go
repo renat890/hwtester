@@ -16,7 +16,7 @@ const (
 
 type HWTest interface {
 	Name() string
-	Run(ctx context.Context) TestResult
+	Run(ctx context.Context, logCh chan string) TestResult
 }
 
 type TestResult struct {

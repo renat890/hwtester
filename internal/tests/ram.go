@@ -26,7 +26,7 @@ func NewTestRAM(mg MemGetter, expectedMem int) *RAM {
 	}
 }
 
-func (r *RAM) Run(ctx context.Context) (result hw.TestResult) {
+func (r *RAM) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
 	const threshold float64 = 0.02
 
 	start := time.Now()

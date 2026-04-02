@@ -57,7 +57,7 @@ func TestRam(t *testing.T) {
 		t.Run(tC.desc, func(t *testing.T) {
 			testRAM := NewTestRAM(&mockMem{memV: int(tC.testMem)}, 65536)
 
-			actual := testRAM.Run(ctx)
+			actual := testRAM.Run(ctx, make(chan string))
 			assert.Equal(t, tC.expected.Status, actual.Status)
 		})
 	}
@@ -68,7 +68,7 @@ func TestRamError(t *testing.T) {
 	defer cancel()
 
 	testRAM := NewTestRAM(&mockMem{memV: 65536, err: errors.New("hardware fail")}, 65536)
-	actual := testRAM.Run(ctx)
+	actual := testRAM.Run(ctx, make(chan string))
 	assert.Equal(t, hw.Error, actual.Status)
 
 }

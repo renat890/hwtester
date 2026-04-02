@@ -44,12 +44,14 @@ type Model struct {
 	results       []hw.TestResult
 	cancel        context.CancelFunc
 	final         hw.Status
+	logs 		  *strings.Builder
+	logCh         chan string
 
 	tests []hw.HWTest
 }
 
 type ModelRunner interface {
-	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult) []hw.TestResult
+	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan string) []hw.TestResult
 }
 
 func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest) Model {
@@ -58,6 +60,7 @@ func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest) Model {
 		cfg:           cfg,
 		mRunner:       mRunner,
 		tests:         tests,
+		logs: &strings.Builder{},
 	}
 }
 
@@ -81,13 +84,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.currentScreen = runScreen
 			m.ch = make(chan hw.TestResult)
+			m.logCh = make(chan string, 100)
 			ctx, cancel := context.WithCancel(context.Background())
 			m.cancel = cancel
 			go func() {
-				m.mRunner.Run(ctx, m.tests, m.ch)
+				m.mRunner.Run(ctx, m.tests, m.ch, m.logCh)
 				close(m.ch)
+				close(m.logCh)
 			}()
-			return m, m.waitForResult(m.ch)
+			return m, tea.Batch(m.waitForResult(m.ch), m.waitForLog(m.logCh))
 		case "ctrl+c":
 			if m.cancel != nil {
 				m.cancel()
@@ -98,6 +103,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}()
 			}
+			if m.logCh != nil {
+				go func ()  {
+					for range m.logCh {}	
+				}()
+			}
 
 			m.currentScreen = resultScreen
 			return m, nil
@@ -105,6 +115,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TestDoneMsg:
 		m.results = append(m.results, msg.Result)
 		return m, m.waitForResult(m.ch)
+	case LogMsg:
+		m.logs.WriteString(string(msg))
+		return m, m.waitForLog(m.logCh)
 	case AllDoneMsg:
 		m.currentScreen = resultScreen
 		m.final = msg.Final
@@ -139,7 +152,7 @@ func (m Model) View() tea.View {
 		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
 		s.WriteByte(byte('\n'))
 
-		logField := "Здесь будут логи"
+		logField := m.logs.String()
 		var tmplBuilder strings.Builder
 
 		tmplBuilder.WriteString("Ход тестирования 68хх:\n\n")
@@ -225,5 +238,18 @@ func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {
 		}
 
 		return TestDoneMsg{Result: result}
+	}
+}
+
+type LogMsg string
+type LastLogMsg string
+
+func (m Model) waitForLog(ch chan string) tea.Cmd {
+	return func() tea.Msg {
+		str, ok := <- ch
+		if !ok {
+			return LastLogMsg("")
+		}
+		return LogMsg(str)
 	}
 }

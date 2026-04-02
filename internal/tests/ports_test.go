@@ -52,7 +52,7 @@ func TestCOM(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			testCOM := NewTestCOM(&mockCOMTest{info: tC.comInfo}, confPorts)
-			actual := testCOM.Run(ctx)
+			actual := testCOM.Run(ctx, make(chan string))
 			assert.Equal(t, tC.expected, actual.Status)
 		})
 	}
@@ -63,7 +63,7 @@ func TestCOMError(t *testing.T) {
 	defer cancel()
 
 	testCOM := NewTestCOM(&mockCOMTest{err: errors.New("hardware error")}, confPorts)
-	actual := testCOM.Run(ctx)
+	actual := testCOM.Run(ctx, make(chan string))
 	assert.Equal(t, hw.Error, actual.Status)
 }
 
@@ -103,7 +103,7 @@ func TestEthernets(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			testEthernets := NewEthernetsTest(&mockEthernetsInfo{pi: tC.portsInfo}, confPorts)
-			actual := testEthernets.Run(ctx)
+			actual := testEthernets.Run(ctx, make(chan string))
 			assert.Equal(t, tC.expected, actual.Status)
 		})
 	}
@@ -114,7 +114,7 @@ func TestEthernetsError(t *testing.T) {
 	defer cancel()
 
 	testEthernets := NewEthernetsTest(&mockEthernetsInfo{err: errors.New("hardware error")}, confPorts)
-	actual := testEthernets.Run(ctx)
+	actual := testEthernets.Run(ctx, make(chan string))
 	assert.Equal(t, hw.Error, actual.Status)
 }
 
@@ -157,7 +157,7 @@ func TestUSB(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			testUSB := NewUSBTest(&mockUSBInfo{ui: tC.usbInfo}, confUSB)
-			actual := testUSB.Run(ctx)
+			actual := testUSB.Run(ctx, make(chan string))
 			assert.Equal(t, tC.expected, actual.Status)
 		})
 	}
@@ -168,6 +168,6 @@ func TestUSBError(t *testing.T) {
 	defer cancel()
 
 	testUSB := NewUSBTest(&mockUSBInfo{err: errors.New("hardware error")}, confUSB)
-	actual := testUSB.Run(ctx)
+	actual := testUSB.Run(ctx, make(chan string))
 	assert.Equal(t, hw.Error, actual.Status)
 }

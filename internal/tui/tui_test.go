@@ -18,7 +18,7 @@ type mockRunner struct {
 	results []hw.TestResult
 }
 
-func (m mockRunner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult) []hw.TestResult {
+func (m mockRunner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan string) []hw.TestResult {
 	for _, val := range m.results {
 		if ctx.Err() != nil {
 			return m.results
