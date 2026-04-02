@@ -1,18 +1,22 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"factorytest/internal/config"
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"os/exec"
 	"runtime"
 	"slices"
 	"strings"
 	"sync"
 	"syscall"
+	"text/template"
 	"time"
 
 	"github.com/diskfs/go-diskfs"
@@ -573,4 +577,183 @@ func scsiDevices() ([]DiskInfo, error) {
 	}
 
 	return disks, nil
+}
+
+// тест сетевых портов
+
+const nameNetNamespace = "testns"
+
+func loadTemplates() (map[string]*template.Template, error) {
+	result := map[string]*template.Template{}
+	patterns := map[string]string{
+		"preTest": "ip netns add {{.ns}}",
+		"postTest": "ip netns delete {{.ns}}",
+		"preEachEth": `sh -c "ip link set {{.eth}} netns {{.ns}} && ip netns exec {{.ns}} ip addr add {{.ip}}/24 dev {{.eth}} && ip netns exec {{.ns}} ip link set {{.eth}} up"`,
+		"postEachEth": "ip netns exec {{.ns}} ip link set {{.eth}} netns 1",
+	}
+
+	for name, pattern := range patterns {
+		tmpl, err := template.New(name).Parse(pattern)
+		if err != nil {
+			return nil, err
+		}
+		result[name] = tmpl 
+	}
+
+	return result, nil
+}
+
+func splitCmd(cmd string) (string, []string) {
+	cmds := strings.Split(cmd, " ")
+	return cmds[0], cmds[1:]
+}
+
+func runCmd(cmd string) error {
+	cmdC, cmdA := splitCmd(cmd)
+	_, err := exec.Command(cmdC, cmdA...).Output() 
+	return err
+}
+
+func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet) (PortsInfo, error) {
+	portsInfoRes := PortsInfo{}
+	// Загружаю все возможные шаблоны
+	tmpls, err := loadTemplates()
+	if err != nil {
+		return PortsInfo{}, err
+	}
+	type args struct {
+		ns string
+		ip string
+		eth string
+	}
+	var cmd bytes.Buffer
+	
+	// выполняю действия перед тестами сетевых интерфейсов
+	err = tmpls["preTest"].Execute(&cmd, args{ns: nameNetNamespace})
+	if err != nil {
+		return PortsInfo{}, err
+	}
+	if err = runCmd(cmd.String()); err != nil {
+		return PortsInfo{}, err
+	}
+
+	// создание пар портов
+	if len(eths) != 4 {
+		return PortsInfo{}, errors.New("количество портов не равно 4")
+	}
+	pairs := map[config.Ethernet]config.Ethernet{
+		eths[0]: eths[1],
+		eths[1]: eths[0],
+		eths[2]: eths[3],
+		eths[3]: eths[2],
+	}
+
+	// их перебор
+	result := make(chan int)
+	
+	for client, server := range pairs {
+		func ()  {
+			// перед запуском тестов на порту для каждого клиента
+			cmd.Reset()
+			if err = tmpls["preEachEth"].Execute(&cmd, args{ns: nameNetNamespace, eth: client.Name, ip: client.Ip}); err != nil {
+				log.Println(err)
+				return 
+			}
+			if err = runCmd(cmd.String()); err != nil {
+				log.Println(err)
+				return 
+			}
+			// в конце каждого теста
+			defer func ()  {
+				cmd.Reset()
+				if err = tmpls["postEachEth"].Execute(&cmd, args{ns: nameNetNamespace, eth: client.Name}); err != nil {
+					log.Println(err)
+					return  
+				}
+				if err = runCmd(cmd.String()); err != nil {
+					log.Println(err)
+				}
+			}()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
+			defer cancel()
+
+			// сам тест портов
+			go listen(ctx, result, server.Ip, server.Port)
+			time.Sleep(500 * time.Millisecond)
+
+			cmd.Reset()
+			// TODO: законфижить путь до бинарника отрпавителя
+			if err = runCmd(fmt.Sprintf("ip netns exec %s ./eth-util --mode=client --ip=%s", nameNetNamespace, server.Ip)); err != nil {
+				log.Println(err)
+			}
+
+			actual := <- result
+			if actual != expectedCount {
+				log.Println("Для пары тест сетевых портов провален")
+				log.Println("Получено пакетов: ", actual)
+				portsInfoRes.PacketsLoss += (expectedCount - actual)
+			}
+			portsInfoRes.Ports = append(portsInfoRes.Ports, server.Name)
+		}()
+		
+		
+		
+	}
+
+	// выполняю действия после тестов сетевых интерфейсов
+	cmd.Reset()
+	err = tmpls["postTest"].Execute(&cmd, args{ns: nameNetNamespace})
+	if err != nil {
+		return PortsInfo{}, err
+	}
+	if err = runCmd(cmd.String()); err != nil {
+		return PortsInfo{}, err
+	}
+
+	return portsInfoRes, nil
+}
+
+const (
+	expectedMsg = "expected message"
+	expectedCount = 1_000
+)
+
+func listen(ctx context.Context, result chan int, ip, port string) {
+	address := fmt.Sprintf("%s:%s", ip, port)
+	conn, err := net.ListenPacket("udp", address)
+	if err != nil {
+		log.Println(err)
+		result <- 0
+		return
+	}
+	defer conn.Close()
+	if err = conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		log.Println("Не удалось установить дедлайн на чтение")
+		result <- 0
+		return
+	}
+
+	count := 0
+
+	go func ()  {
+		<- ctx.Done()
+		conn.Close()
+	}()
+
+	for {
+		packet := make([]byte, 1024)
+		n, _, err := conn.ReadFrom(packet)
+		if err != nil {
+			break 
+		}
+		if string(packet[:n]) == expectedMsg {
+			count++
+		}
+		if count == expectedCount {
+			break
+		}
+}
+
+	result <- count
 }
