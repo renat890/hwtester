@@ -88,7 +88,7 @@ type EthernetsTest struct {
 }
 
 type GetterEthernetsInfo interface {
-	GetEthernetsInfo(ctx context.Context) (PortsInfo, error) 
+	GetEthernetsInfo(ctx context.Context, eths []config.Ethernet) (PortsInfo, error) 
 }
 
 func NewEthernetsTest(getterEthernetsInfo GetterEthernetsInfo, conf config.Ports) *EthernetsTest {
@@ -106,7 +106,7 @@ func (e *EthernetsTest) Run(ctx context.Context) (result hw.TestResult) {
 	}()
 	result.Name = e.Name()
 
-	ethernetsInfo, err := e.ei.GetEthernetsInfo(ctx)
+	ethernetsInfo, err := e.ei.GetEthernetsInfo(ctx, e.conf.Ethernets)
 	if err != nil {
 		result.Status = hw.Error
 		result.Details = err.Error()

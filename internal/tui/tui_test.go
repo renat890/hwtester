@@ -44,10 +44,10 @@ var cfg = config.Config{
 	},
 	Ports: config.Ports{
 		Ethernets: []config.Ethernet{
-			{Name: "enp1s0", Address: "192.168.0.101:8765"},
-            {Name: "enp2s0", Address: "192.168.0.102:8765"},
-            {Name: "enp3s0", Address: "193.168.0.101:8765"},
-            {Name: "enp4s0", Address: "193.168.0.101:8765"},
+			{Name: "enp1s0", Ip: "192.168.0.101", Port:"8765"},
+            {Name: "enp2s0", Ip: "192.168.0.102", Port:"8765"},
+            {Name: "enp3s0", Ip: "193.168.0.101", Port:"8765"},
+            {Name: "enp4s0", Ip: "193.168.0.101", Port:"8765"},
 		},
 		COM:       []string{"/dev/ttyS0", "/dev/ttyS1"},
 	},

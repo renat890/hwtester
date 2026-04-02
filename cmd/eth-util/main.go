@@ -12,11 +12,11 @@ import (
 
 
 func main() {
-	var mode string 
+	var mode, ip string 
 	flag.StringVar(&mode, "mode", "server", "workmode for util (server,client)")
+	flag.StringVar(&ip, "ip", "localhost", "target ip")
 	flag.Parse()
 
-	ip := "192.168.0.101"
 	port := "8764"
 
 	switch mode {
