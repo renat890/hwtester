@@ -16,7 +16,7 @@ type mockCOMTest struct {
 	err error
 }
 
-func (m *mockCOMTest) EchoTest(ctx context.Context) (COMInfo, error) {
+func (m *mockCOMTest) EchoTest(ctx context.Context, logCh chan string) (COMInfo, error) {
 	return m.info, m.err
 }
 
@@ -125,7 +125,7 @@ type mockUSBInfo struct {
 	err error
 }
 
-func (m *mockUSBInfo) GetUSBInfo(ctx context.Context) (USBInfo, error) {
+func (m *mockUSBInfo) GetUSBInfo(ctx context.Context, logCh chan string) (USBInfo, error) {
 	return m.ui, m.err
 }
 

@@ -29,7 +29,7 @@ type COMTest struct {
 }
 
 type GetterCOMInfo interface {
-	EchoTest(ctx context.Context) (COMInfo, error) 
+	EchoTest(ctx context.Context, logCh chan string) (COMInfo, error) 
 }
 
 func NewTestCOM(getterComInfo GetterCOMInfo, conf config.Ports) *COMTest {
@@ -47,7 +47,7 @@ func (c *COMTest) Run(ctx context.Context, logCh chan string) (result hw.TestRes
 	}()
 
 	result.Name = c.Name()
-	comInfo, err := c.ci.EchoTest(ctx)
+	comInfo, err := c.ci.EchoTest(ctx, logCh)
 
 	if err != nil {
 		result.Status = hw.Error
@@ -152,7 +152,7 @@ type USBTest struct {
 }
 
 type GetterUSBInfo interface {
-	GetUSBInfo(ctx context.Context) (USBInfo, error)
+	GetUSBInfo(ctx context.Context, logCh chan string) (USBInfo, error)
 }
 
 func NewUSBTest(getterUSBInfo GetterUSBInfo, conf config.USBFlash) *USBTest {
@@ -170,7 +170,7 @@ func (u *USBTest) Run(ctx context.Context, logCh chan string) (result hw.TestRes
 	}()
 	result.Name = u.Name()
 
-	usbInfo, err := u.ui.GetUSBInfo(ctx)
+	usbInfo, err := u.ui.GetUSBInfo(ctx, logCh)
 	if err != nil {
 		result.Status = hw.Error
 		result.Details = err.Error()

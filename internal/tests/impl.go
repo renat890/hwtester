@@ -358,13 +358,13 @@ func getAvgTemp(info []sensors.TemperatureStat) (float64, error) {
 // для COM портов
 const msg = "test com this big message and very big message abracodabra stop"
 
-func (h *HardwareUsage) EchoTest(ctx context.Context) (COMInfo, error) {
+func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan string) (COMInfo, error) {
 	ports, err := serial.GetPortsList()
 	if err != nil {
 		return COMInfo{}, errors.New("Не удалось получить COM порты")
 	}
 	for _, port := range ports {
-		log.Printf("Найден порт: %v\n", port)
+		logCh <- fmt.Sprintf("Найден порт: %v\n", port)
 	}
 	if len(ports) < 2 {
 		return COMInfo{}, errors.New("нет минимального количества портов COM")
@@ -386,17 +386,17 @@ func (h *HardwareUsage) EchoTest(ctx context.Context) (COMInfo, error) {
 		tests = true
 		ctx, cancel := context.WithTimeout(ctx, 2 * time.Second)
 
-		log.Printf("%d попытка прохождения теста с COM-портами\n", i+1)
+		logCh <- fmt.Sprintf("%d попытка прохождения теста с COM-портами\n", i+1)
 		for rPort, wPort := range pairs {
-			log.Printf("Тестирование пары rPort %s, wPort %s\n", rPort, wPort)
+			logCh <- fmt.Sprintf("Тестирование пары rPort %s, wPort %s\n", rPort, wPort)
 			wg.Add(2)
 			go func(r string)  {
 				defer wg.Done()
-				portRead(ctx, r, result)
+				portRead(ctx, r, result, logCh)
 			}(rPort)
 			go func(w string) {
 				defer wg.Done()
-				portWrite(ctx, w)
+				portWrite(ctx, w, logCh)
 			}(wPort) 
 			wg.Wait()
 
@@ -409,7 +409,7 @@ func (h *HardwareUsage) EchoTest(ctx context.Context) (COMInfo, error) {
 		if tests {
 			break
 		} else {
-			log.Println("Неудачная попытка прохождения теста. Перезапускаю тест.")
+			logCh <- fmt.Sprintln("Неудачная попытка прохождения теста. Перезапускаю тест.")
 		}
 	}
 
@@ -420,25 +420,25 @@ func (h *HardwareUsage) EchoTest(ctx context.Context) (COMInfo, error) {
 	return final, nil
 }
 
-func portRead(ctx context.Context, name string, ch chan bool) {
+func portRead(ctx context.Context, name string, ch chan bool, logCh chan string) {
 	port, err := serial.Open(name, &serial.Mode{
 		BaudRate: 115200,
 	})
 	if err != nil {
-		log.Println(err)
+		logCh <- fmt.Sprintln(err)
 		ch <- false
 		return
 	}
 	defer port.Close()
 
 	if err := port.SetReadTimeout(500 * time.Millisecond); err !=  nil {
-		log.Println(err)
+		logCh <- fmt.Sprintln(err)
 		ch <- false
 		return
 	}
 
 	if err := port.ResetInputBuffer(); err != nil {
-		log.Println(err)
+		logCh <- fmt.Sprintln(err)
 		ch <- false
 		return
 	}
@@ -446,7 +446,7 @@ func portRead(ctx context.Context, name string, ch chan bool) {
 	var final strings.Builder
 	buf := make([]byte, 8)
 	numMsg := 1 
-	log.Printf("Запущен порт читатель rPort %s\n", name)
+	logCh <- fmt.Sprintf("Запущен порт читатель rPort %s\n", name)
 	reader:
 	for {
 		select {
@@ -456,7 +456,7 @@ func portRead(ctx context.Context, name string, ch chan bool) {
 		default:
 			n, err := port.Read(buf)
 			if err != nil {
-				log.Printf("Ошибка чтения из COM-порта: %s\n", err.Error())
+				logCh <- fmt.Sprintf("Ошибка чтения из COM-порта: %s\n", err.Error())
 			}
 			numMsg++
 			if n == 0 {
@@ -475,27 +475,27 @@ func portRead(ctx context.Context, name string, ch chan bool) {
 	}
 }
 
-func portWrite(ctx context.Context, name string) {
+func portWrite(ctx context.Context, name string, logCh chan string) {
 	port, err := serial.Open(name, &serial.Mode{
 		BaudRate: 115200,
 	})
 	if err != nil {
-		log.Println(err)
+		logCh <- fmt.Sprintln(err)
 		return
 	}
 	defer port.Close()
-	log.Printf("Запущен порт писатель wPort %s\n", name)
+	logCh <- fmt.Sprintf("Запущен порт писатель wPort %s\n", name)
 	if ctx.Err() != nil {
 		return
 	}
 	_, err = port.Write(([]byte(msg)))
 	if err != nil {
-		log.Printf("Ошибка записи в COM-порт: %s\n", err.Error())
+		logCh <- fmt.Sprintf("Ошибка записи в COM-порт: %s\n", err.Error())
 	}
 }
 
 // для работы с флешками
-func (h *HardwareUsage) GetUSBInfo(ctx context.Context) (USBInfo, error) {
+func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan string) (USBInfo, error) {
 	// TODO: вынести в конфигурационный файл размер флешки
 	const sizeInMB int = 8000
 	disks, err := scsiDevices()
@@ -517,20 +517,20 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context) (USBInfo, error) {
 	for _, diskName := range diskNames {
 		disk, err := diskfs.Open(diskName)
 		if err != nil {
-			log.Println(err)
+			logCh <- fmt.Sprintln(err)
 			continue
 		}
 
 		fs, err := disk.GetFilesystem(1)
 		if err != nil {
-			log.Println(err)
+			logCh <- fmt.Sprintln(err)
 			disk.Close()
 			continue
 		}
 
 		b, err := fs.ReadFile(testFileName)
 		if err != nil {
-			log.Println("Не удалось прочитать файл")
+			logCh <- fmt.Sprintln("Не удалось прочитать файл")
 			disk.Close()
 			continue
 		}
@@ -543,7 +543,7 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context) (USBInfo, error) {
 		}
 
 		if err = disk.Close(); err != nil {
-			log.Printf("ошибка закрытия флешки: %s\n", err.Error())
+			logCh <- fmt.Sprintf("ошибка закрытия флешки: %s\n", err.Error())
 		}
 	}
 
