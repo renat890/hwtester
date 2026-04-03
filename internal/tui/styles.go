@@ -3,13 +3,13 @@ package tui
 import "charm.land/lipgloss/v2"
 
 const (
-	headersColor = "#88C0D0"
+	headerColor = "#88C0D0"
 	defaultColor = "#D8DEE9"
 	passColor = "#A3BE8C"
 	failColor = "#BF616A"
 	errorColor = "#EBCB8B"
 	borderColor = "#4C566A"
-	accntColor = borderColor
+	accentColor = borderColor
 	secondInfoColor = "#616E88"
 )
 
@@ -17,10 +17,10 @@ var (
 	headStyle = lipgloss.NewStyle().
 				Bold(true).
 				Padding(2).
-				Foreground(lipgloss.Color(headersColor))
+				Foreground(lipgloss.Color(headerColor))
 
 	head2Style = lipgloss.NewStyle().
-				 Foreground(lipgloss.Color(headersColor))
+				 Foreground(lipgloss.Color(headerColor))
 
 	passStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(passColor))
@@ -35,5 +35,5 @@ var (
 				  Padding(0, 1)
 	
 	spinnerStyle = lipgloss.NewStyle().
-				   Foreground(lipgloss.Color(accntColor))
+				   Foreground(lipgloss.Color(headerColor))
 )

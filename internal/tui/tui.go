@@ -83,7 +83,7 @@ func (m Model) Results() []hw.TestResult {
 }
 
 func (m Model) Init() tea.Cmd {
-	return m.spin.Tick
+	return nil
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -109,7 +109,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				close(m.ch)
 				close(m.logCh)
 			}()
-			return m, tea.Batch(m.waitForResult(m.ch), m.waitForLog(m.logCh))
+			return m, tea.Batch(m.waitForResult(m.ch), m.waitForLog(m.logCh), m.spin.Tick)
 		case "ctrl+c":
 			if m.cancel != nil {
 				m.cancel()
@@ -148,6 +148,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.waitForLog(m.logCh)
 	case AllDoneMsg:
 		m.currentScreen = resultScreen
+		// остановка спиннера
+		m.spin = spinner.New()
 		m.final = msg.Final
 		m.results = msg.Results
 		return m, nil
