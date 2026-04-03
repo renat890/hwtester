@@ -7,7 +7,6 @@ import (
 	"errors"
 	"factorytest/internal/config"
 	"fmt"
-	"log"
 	"math"
 	"net"
 	"os/exec"
@@ -614,7 +613,7 @@ func runCmd(cmd string) error {
 	return err
 }
 
-func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet) (PortsInfo, error) {
+func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan string) (PortsInfo, error) {
 	portsInfoRes := PortsInfo{}
 	// Загружаю все возможные шаблоны
 	tmpls, err := loadTemplates()
@@ -656,22 +655,22 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			// перед запуском тестов на порту для каждого клиента
 			cmd.Reset()
 			if err = tmpls["preEachEth"].Execute(&cmd, args{ns: nameNetNamespace, eth: client.Name, ip: client.Ip}); err != nil {
-				log.Println(err)
+				logCh <- fmt.Sprintln(err)
 				return 
 			}
 			if err = runCmd(cmd.String()); err != nil {
-				log.Println(err)
+				logCh <- fmt.Sprintln(err)
 				return 
 			}
 			// в конце каждого теста
 			defer func ()  {
 				cmd.Reset()
 				if err = tmpls["postEachEth"].Execute(&cmd, args{ns: nameNetNamespace, eth: client.Name}); err != nil {
-					log.Println(err)
+					logCh <- fmt.Sprintln(err)
 					return  
 				}
 				if err = runCmd(cmd.String()); err != nil {
-					log.Println(err)
+					logCh <- fmt.Sprintln(err)
 				}
 			}()
 
@@ -679,19 +678,19 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			defer cancel()
 
 			// сам тест портов
-			go listen(ctx, result, server.Ip, server.Port)
+			go listen(ctx, result, server.Ip, server.Port, logCh)
 			time.Sleep(500 * time.Millisecond)
 
 			cmd.Reset()
 			// TODO: законфижить путь до бинарника отрпавителя
 			if err = runCmd(fmt.Sprintf("ip netns exec %s ./eth-util --mode=client --ip=%s", nameNetNamespace, server.Ip)); err != nil {
-				log.Println(err)
+				logCh <- fmt.Sprintln(err)
 			}
 
 			actual := <- result
 			if actual != expectedCount {
-				log.Println("Для пары тест сетевых портов провален")
-				log.Println("Получено пакетов: ", actual)
+				logCh <- fmt.Sprintln("Для пары тест сетевых портов провален")
+				logCh <- fmt.Sprintln("Получено пакетов: ", actual)
 				portsInfoRes.PacketsLoss += (expectedCount - actual)
 			}
 			portsInfoRes.Ports = append(portsInfoRes.Ports, server.Name)
@@ -719,17 +718,17 @@ const (
 	expectedCount = 1_000
 )
 
-func listen(ctx context.Context, result chan int, ip, port string) {
+func listen(ctx context.Context, result chan int, ip, port string, logCh chan string) {
 	address := fmt.Sprintf("%s:%s", ip, port)
 	conn, err := net.ListenPacket("udp", address)
 	if err != nil {
-		log.Println(err)
+		logCh <- fmt.Sprintln(err)
 		result <- 0
 		return
 	}
 	defer conn.Close()
 	if err = conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		log.Println("Не удалось установить дедлайн на чтение")
+		logCh <- fmt.Sprintln("Не удалось установить дедлайн на чтение")
 		result <- 0
 		return
 	}

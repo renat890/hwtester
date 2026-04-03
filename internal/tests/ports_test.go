@@ -74,7 +74,7 @@ type mockEthernetsInfo struct {
 	err error
 }
 
-func (m *mockEthernetsInfo) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet) (PortsInfo, error) {
+func (m *mockEthernetsInfo) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan string) (PortsInfo, error) {
 	return m.pi, m.err
 }
 
