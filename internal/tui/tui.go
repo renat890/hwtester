@@ -7,9 +7,11 @@ import (
 	"factorytest/internal/config"
 	"factorytest/internal/hw"
 	"fmt"
+	"slices"
 	"strings"
 	"text/template"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -46,6 +48,8 @@ type Model struct {
 	final         hw.Status
 	logs 		  *strings.Builder
 	logCh         chan string
+	currentTest   string
+	spin          spinner.Model      
 
 	tests []hw.HWTest
 }
@@ -55,12 +59,22 @@ type ModelRunner interface {
 }
 
 func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest) Model {
+	var cur string
+	if len(tests) > 0 {
+		cur = tests[0].Name()
+	}
+
 	return Model{
 		currentScreen: startScreen,
 		cfg:           cfg,
 		mRunner:       mRunner,
 		tests:         tests,
 		logs: &strings.Builder{},
+		currentTest: cur,
+		spin: spinner.New(
+			spinner.WithSpinner(spinner.Points),
+			spinner.WithStyle(spinnerStyle),
+		),
 	}
 }
 
@@ -69,7 +83,7 @@ func (m Model) Results() []hw.TestResult {
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return m.spin.Tick
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -81,6 +95,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.currentScreen == resultScreen {
 				return m, tea.Quit
+			}
+			if m.currentScreen == runScreen {
+				break
 			}
 			m.currentScreen = runScreen
 			m.ch = make(chan hw.TestResult)
@@ -113,6 +130,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case TestDoneMsg:
+		// тут ещё и указываем тест, который выполняется в текущий момент
+		var curInd int
+		if len(m.tests) != 0 {
+			curInd = slices.IndexFunc(m.tests, func(t hw.HWTest) bool {
+				return t.Name() == m.currentTest
+			})
+		}
+		if curInd < (len(m.tests) - 1)  {
+			m.currentTest = m.tests[curInd + 1].Name()
+		}
+
 		m.results = append(m.results, msg.Result)
 		return m, m.waitForResult(m.ch)
 	case LogMsg:
@@ -123,6 +151,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.final = msg.Final
 		m.results = msg.Results
 		return m, nil
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spin, cmd = m.spin.Update(msg)
+		return m, cmd
 	}
 
 	return m, nil
@@ -152,16 +184,25 @@ func (m Model) View() tea.View {
 		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
 		s.WriteByte(byte('\n'))
 
-		logField := m.logs.String()
+		var logBuilder strings.Builder
+		logBuilder.WriteString(head2Style.Render("Лог:"))
+		logBuilder.WriteString("\n\n")
+		logBuilder.WriteString(m.logs.String())
+
+		logField := borderStyle.Render(logBuilder.String())
+
 		var tmplBuilder strings.Builder
 
-		tmplBuilder.WriteString("Ход тестирования 68хх:\n\n")
+		tmplBuilder.WriteString(head2Style.Render("Ход тестирования 68хх:"))
+		tmplBuilder.WriteString("\n\n")
 		for _, val := range m.results {
 			tmplBuilder.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, styledStatus(val.Status)))
 		}
+		tmplBuilder.WriteString(fmt.Sprintf("%s\t%s", m.currentTest, m.spin.View()))
+		runField := borderStyle.Render(tmplBuilder.String())
 
 		// объединение в 2 столбца
-		s.WriteString(lipgloss.JoinHorizontal(lipgloss.Center, tmplBuilder.String(), logField))
+		s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, runField, logField))
 	case resultScreen:
 		s.Reset()
 		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))

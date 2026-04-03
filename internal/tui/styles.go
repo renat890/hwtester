@@ -19,6 +19,9 @@ var (
 				Padding(2).
 				Foreground(lipgloss.Color(headersColor))
 
+	head2Style = lipgloss.NewStyle().
+				 Foreground(lipgloss.Color(headersColor))
+
 	passStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(passColor))
 	failStyle = lipgloss.NewStyle().
@@ -27,5 +30,10 @@ var (
 				 Foreground(lipgloss.Color(errorColor))
 	
 	borderStyle = lipgloss.NewStyle().
-				  Foreground(lipgloss.Color(borderColor))
+				  BorderForeground(lipgloss.Color(borderColor)).
+				  BorderStyle(lipgloss.NormalBorder()).
+				  Padding(0, 1)
+	
+	spinnerStyle = lipgloss.NewStyle().
+				   Foreground(lipgloss.Color(accntColor))
 )
