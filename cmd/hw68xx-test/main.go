@@ -16,6 +16,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
+var version = "dev"
+
 func main() {
 	if os.Getuid() != 0 {
 		log.Fatal("программа должна быть запущена с правами суперпользователя")
@@ -40,7 +42,7 @@ func main() {
 	}
 
 	r := runner.NewTestRunner()
-	model := tui.NewModel(*cfg, r, hwTests)
+	model := tui.NewModel(*cfg, r, hwTests, version)
 	modelR, errR := tea.NewProgram(model).Run()
 	if errR != nil {
 		log.Fatalf("не удалось корректно завершить программу: %v", errR)
