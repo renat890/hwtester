@@ -585,10 +585,10 @@ const nameNetNamespace = "testns"
 func loadTemplates() (map[string]*template.Template, error) {
 	result := map[string]*template.Template{}
 	patterns := map[string]string{
-		"preTest": "ip netns add {{.ns}}",
-		"postTest": "ip netns delete {{.ns}}",
-		"preEachEth": `sh -c "ip link set {{.eth}} netns {{.ns}} && ip netns exec {{.ns}} ip addr add {{.ip}}/24 dev {{.eth}} && ip netns exec {{.ns}} ip link set {{.eth}} up"`,
-		"postEachEth": "ip netns exec {{.ns}} ip link set {{.eth}} netns 1",
+		"preTest": "ip netns add {{.NS}}",
+		"postTest": "ip netns delete {{.NS}}",
+		"preEachEth": `sh -c "ip link set {{.Eth}} netns {{.NS}} && ip netns exec {{.NS}} ip addr add {{.IP}}/24 dev {{.Eth}} && ip netns exec {{.NS}} ip link set {{.Eth}} up"`,
+		"postEachEth": "ip netns exec {{.NS}} ip link set {{.Eth}} netns 1",
 	}
 
 	for name, pattern := range patterns {
@@ -621,14 +621,14 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 		return PortsInfo{}, err
 	}
 	type args struct {
-		ns string
-		ip string
-		eth string
+		NS string
+		IP string
+		Eth string
 	}
 	var cmd bytes.Buffer
 	
 	// выполняю действия перед тестами сетевых интерфейсов
-	err = tmpls["preTest"].Execute(&cmd, args{ns: nameNetNamespace})
+	err = tmpls["preTest"].Execute(&cmd, args{NS: nameNetNamespace})
 	if err != nil {
 		return PortsInfo{}, err
 	}
@@ -654,7 +654,7 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 		func ()  {
 			// перед запуском тестов на порту для каждого клиента
 			cmd.Reset()
-			if err = tmpls["preEachEth"].Execute(&cmd, args{ns: nameNetNamespace, eth: client.Name, ip: client.Ip}); err != nil {
+			if err = tmpls["preEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name, IP: client.Ip}); err != nil {
 				logCh <- fmt.Sprintln(err)
 				return 
 			}
@@ -665,7 +665,7 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			// в конце каждого теста
 			defer func ()  {
 				cmd.Reset()
-				if err = tmpls["postEachEth"].Execute(&cmd, args{ns: nameNetNamespace, eth: client.Name}); err != nil {
+				if err = tmpls["postEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name}); err != nil {
 					logCh <- fmt.Sprintln(err)
 					return  
 				}
@@ -702,7 +702,7 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 
 	// выполняю действия после тестов сетевых интерфейсов
 	cmd.Reset()
-	err = tmpls["postTest"].Execute(&cmd, args{ns: nameNetNamespace})
+	err = tmpls["postTest"].Execute(&cmd, args{NS: nameNetNamespace})
 	if err != nil {
 		return PortsInfo{}, err
 	}
