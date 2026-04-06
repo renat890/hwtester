@@ -8,12 +8,15 @@ import (
 	"factorytest/internal/hw"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 )
 
 //go:embed template/*.txt
@@ -38,6 +41,12 @@ type AllDoneMsg struct {
 	Final   hw.Status
 }
 
+
+
+type ModelRunner interface {
+	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan string) []hw.TestResult
+}
+
 type Model struct {
 	currentScreen screen
 	cfg           config.Config
@@ -46,19 +55,16 @@ type Model struct {
 	results       []hw.TestResult
 	cancel        context.CancelFunc
 	final         hw.Status
-	logs 		  *strings.Builder
+	logs 		  []string
 	logCh         chan string
 	currentTest   string
-	spin          spinner.Model      
+	spin          spinner.Model
+	version string      
 
 	tests []hw.HWTest
 }
 
-type ModelRunner interface {
-	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan string) []hw.TestResult
-}
-
-func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest) Model {
+func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest, version string) Model {
 	var cur string
 	if len(tests) > 0 {
 		cur = tests[0].Name()
@@ -69,12 +75,13 @@ func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest) Model {
 		cfg:           cfg,
 		mRunner:       mRunner,
 		tests:         tests,
-		logs: &strings.Builder{},
+		logs: []string{},
 		currentTest: cur,
 		spin: spinner.New(
 			spinner.WithSpinner(spinner.Points),
 			spinner.WithStyle(spinnerStyle),
 		),
+		version: version,
 	}
 }
 
@@ -87,6 +94,8 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// TODO: сделать зависимой от размера экрана
+	const logsSize = 20
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -144,10 +153,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.results = append(m.results, msg.Result)
 		return m, m.waitForResult(m.ch)
 	case LogMsg:
-		m.logs.WriteString(string(msg))
+		m.logs = append(m.logs, string(msg))
+		// тут перестроение буфера для логов
+		if tmp := len(m.logs); tmp > logsSize {
+			m.logs = m.logs[tmp - logsSize:]
+		}
 		return m, m.waitForLog(m.logCh)
 	case AllDoneMsg:
 		m.currentScreen = resultScreen
+		// TODO: заменить на продолжение при помощи нажатия клавиши
+		time.Sleep(1 * time.Second) // УБРАТЬ!
 		// остановка спиннера
 		m.spin = spinner.New()
 		m.final = msg.Final
@@ -162,25 +177,65 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+const (
+	leftColWidth = 30
+	rightColWidth = 80
+	padding = 1
+	border = 1
+	checkMark = "✓"
+)
+
 func (m Model) View() tea.View {
 	s := strings.Builder{}
 
 	switch m.currentScreen {
 	case startScreen:
 		s.Reset()
-		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
-		s.WriteByte(byte('\n'))
-		s.WriteString("Тестирование 68хх по следующим пунктам:\n\n")
+		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s - стартовая конфигурация", m.version))
 
-		tests := []string{"ОЗУ", "ПЗУ", "Порты COM", "Порты Ethernet",
-			"Порты USB", "Стресс-тестирование (система охлаждения)"}
-		for _, val := range tests {
-			s.WriteString(val)
-			s.WriteByte(byte('\n'))
+		// формирование блока с тестами
+		rows := []string{head2Style.Render("ТЕСТЫ К ЗАПУСКУ"),}
+		for _, t := range m.tests {
+			rows = append(rows, fmt.Sprintf("%s %s", checkMark, t.Name()))
 		}
-		s.WriteByte(byte('\n'))
-		s.WriteString("Параметры для тестирования:\n")
-		s.WriteString(genConfString(m.cfg))
+		itog := fmt.Sprintf("Итого: %d тестов", len(m.tests))
+		rows = append(rows, "", itog)
+		left := lipgloss.JoinVertical(lipgloss.Left, rows...)
+		left = borderStyle.Width(leftColWidth).Render(left)
+
+		// Формирование блока с ОЗУ
+		innerWidth := rightColWidth / 2 - 2 * border - 2 * padding
+
+		label := head2Style.Render("ОЗУ")
+		param := "Объем, Мб"
+		strRam := paramRow(Param{param, strconv.Itoa(m.cfg.RAM.ValueMB)}, innerWidth)
+
+		// блок с пзу
+		
+		cfgROM := []Param{
+			{"Дисков", fmt.Sprintf("%d", m.cfg.ROM.Nums)},
+			{"Объем диска", fmt.Sprintf("%d", m.cfg.ROM.ValueMBEach)},
+			{"Скорость чтения", fmt.Sprintf("%d МБ/с", m.cfg.ROM.MinReadVMBs)},
+			{"Скорость записи", fmt.Sprintf("%d МБ/с",m.cfg.ROM.MinWriteVMBs)},
+		}
+
+		label = head2Style.Render("ПЗУ")
+		fields := []string{label,}
+		for _, param := range cfgROM {
+			fields = append(fields, paramRow(param, innerWidth))
+		}
+
+		fieldROM := borderStyle.Width(rightColWidth / 2).Render(lipgloss.JoinVertical(lipgloss.Left, fields...))
+		// TODO: связные вычисления, нужно разделить
+		fieldRam := borderStyle.Width(rightColWidth / 2).Height(lipgloss.Height(fieldROM)).Render(lipgloss.JoinVertical(lipgloss.Left, label, strRam))
+
+		right := lipgloss.JoinVertical(lipgloss.Left, head2Style.Render("Параметры"), lipgloss.JoinHorizontal(lipgloss.Left, fieldRam, fieldROM))
+
+		// все тело экрана
+		body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+
+		footer := "Enter - запустить q - выход"
+		s.WriteString(lipgloss.JoinVertical(lipgloss.Left, title, body, footer))
 	case runScreen:
 		s.Reset()
 		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
@@ -189,7 +244,7 @@ func (m Model) View() tea.View {
 		var logBuilder strings.Builder
 		logBuilder.WriteString(head2Style.Render("Лог:"))
 		logBuilder.WriteString("\n\n")
-		logBuilder.WriteString(m.logs.String())
+		logBuilder.WriteString(strings.Join(m.logs, ""))
 
 		logField := borderStyle.Render(logBuilder.String())
 
@@ -223,6 +278,19 @@ func (m Model) View() tea.View {
 	return v
 }
 
+type Param struct {
+	Name string 
+	Value string
+}
+
+func paramRow(param Param, width int) string {
+	dots := width - lipgloss.Width(param.Name) - lipgloss.Width(param.Value) - 2
+	if dots < 0 {
+		dots = 0
+	}
+	return fmt.Sprintf("%s %s %s", param.Name, strings.Repeat(".", dots), param.Value)
+}
+
 func genConfString(cfg config.Config) string {
 	var buffer bytes.Buffer
 	if err := tmplConf.ExecuteTemplate(&buffer, "conf.txt", cfg); err != nil {
@@ -246,7 +314,6 @@ func styledStatus(status hw.Status) hw.Status {
 }
 
 func genResultString(items []hw.TestResult) string {
-	var buffer bytes.Buffer
 	itemsCopy := make([]hw.TestResult, len(items))
 	copy(itemsCopy, items)
 	// делаю результаты разных цветов
@@ -254,11 +321,23 @@ func genResultString(items []hw.TestResult) string {
 		itemsCopy[i].Status = styledStatus(itemsCopy[i].Status )
 	}
 
-	if err := tmplConf.ExecuteTemplate(&buffer, "result.txt", itemsCopy); err != nil {
-		return "не удалось создать текст результатов " + err.Error()
-	}
+	tHeaders := []string{"Имя","Статус","Детали","Метрики"}
+	tRows := [][]string{}
 
-	return buffer.String()
+	for _, row := range itemsCopy {
+		var metrs strings.Builder
+		for key, val := range row.Metrics {
+			metrs.WriteString(fmt.Sprintf("%s: %v\n", key, val))
+		}
+		tRows = append(tRows, []string{row.Name, string(row.Status), row.Details, metrs.String() })
+	}
+	
+	t := table.New().
+		Headers(tHeaders...).
+		Rows(tRows...)
+
+	out := fmt.Sprintf("%s\n", t.Render())
+	return out
 }
 
 func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {

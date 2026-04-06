@@ -67,7 +67,7 @@ var cfg = config.Config{
 	}}
 
 func TestTui(t *testing.T) {
-	m := NewModel(cfg, mockRunner{}, []hw.HWTest{})
+	m := NewModel(cfg, mockRunner{}, []hw.HWTest{}, "")
 	assert.Equal(t, startScreen, m.currentScreen)
 
 	button := tea.KeyPressMsg{
@@ -80,7 +80,7 @@ func TestTui(t *testing.T) {
 }
 
 func TestView(t *testing.T) {
-	m := NewModel(cfg, mockRunner{}, []hw.HWTest{})
+	m := NewModel(cfg, mockRunner{}, []hw.HWTest{}, "")
 	assert.Equal(t, startScreen, m.currentScreen)
 	var v tea.View = m.View()
 	assert.Contains(t, v.Content, strconv.Itoa(cfg.RAM.ValueMB))
@@ -92,7 +92,7 @@ func TestView(t *testing.T) {
 }
 
 func TestQuit(t *testing.T) {
-	m := NewModel(cfg, mockRunner{}, []hw.HWTest{})
+	m := NewModel(cfg, mockRunner{}, []hw.HWTest{}, "")
 	button := tea.KeyPressMsg{
 		Code: 'q',
 	}
@@ -104,7 +104,7 @@ func TestQuit(t *testing.T) {
 }
 
 func TestOneRun(t *testing.T) {
-	m := NewModel(cfg, mockRunner{}, []hw.HWTest{})
+	m := NewModel(cfg, mockRunner{}, []hw.HWTest{}, "")
 	assert.Equal(t, startScreen, m.currentScreen)
 
 	button := tea.KeyPressMsg{
@@ -124,7 +124,7 @@ func TestOneRun(t *testing.T) {
 }
 
 func TestAll(t *testing.T) {
-	m := NewModel(cfg, mockRunner{}, []hw.HWTest{})
+	m := NewModel(cfg, mockRunner{}, []hw.HWTest{}, "")
 	assert.Equal(t, startScreen, m.currentScreen)
 
 	button := tea.KeyPressMsg{
