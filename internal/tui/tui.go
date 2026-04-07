@@ -8,7 +8,6 @@ import (
 	"factorytest/internal/hw"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -30,6 +29,11 @@ const (
 	startScreen screen = iota
 	runScreen
 	resultScreen
+)
+
+const (
+	padding = 1
+	border = 1
 )
 
 type TestDoneMsg struct {
@@ -177,14 +181,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-const (
-	leftColWidth = 30
-	rightColWidth = 80
-	padding = 1
-	border = 1
-	checkMark = "✓"
-)
-
 func (m Model) View() tea.View {
 	s := strings.Builder{}
 
@@ -194,42 +190,22 @@ func (m Model) View() tea.View {
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s - стартовая конфигурация", m.version))
 
 		// формирование блока с тестами
-		rows := []string{head2Style.Render("ТЕСТЫ К ЗАПУСКУ"),}
-		for _, t := range m.tests {
-			rows = append(rows, fmt.Sprintf("%s %s", checkMark, t.Name()))
-		}
-		itog := fmt.Sprintf("Итого: %d тестов", len(m.tests))
-		rows = append(rows, "", itog)
-		left := lipgloss.JoinVertical(lipgloss.Left, rows...)
-		left = borderStyle.Width(leftColWidth).Render(left)
+		left := testsPanel(m.tests)
 
-		// Формирование блока с ОЗУ
-		innerWidth := rightColWidth / 2 - 2 * border - 2 * padding
+		fieldROM := romPanel(m.cfg.ROM, rightColWidth / 2)
+		fieldRam := ramPanel(m.cfg.RAM, rightColWidth / 2)
+		fieldEth := ethPanel(m.cfg.Ports.Ethernets, rightColWidth)
+		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWidth)
+		fieldUSB := usbPanel(m.cfg.USBFlash, rightColWidth / 2)
+		fieldStress := stressPanel(m.cfg.Stress, rightColWidth)
 
-		label := head2Style.Render("ОЗУ")
-		param := "Объем, Мб"
-		strRam := paramRow(Param{param, strconv.Itoa(m.cfg.RAM.ValueMB)}, innerWidth)
-
-		// блок с пзу
-		
-		cfgROM := []Param{
-			{"Дисков", fmt.Sprintf("%d", m.cfg.ROM.Nums)},
-			{"Объем диска", fmt.Sprintf("%d", m.cfg.ROM.ValueMBEach)},
-			{"Скорость чтения", fmt.Sprintf("%d МБ/с", m.cfg.ROM.MinReadVMBs)},
-			{"Скорость записи", fmt.Sprintf("%d МБ/с",m.cfg.ROM.MinWriteVMBs)},
-		}
-
-		label = head2Style.Render("ПЗУ")
-		fields := []string{label,}
-		for _, param := range cfgROM {
-			fields = append(fields, paramRow(param, innerWidth))
-		}
-
-		fieldROM := borderStyle.Width(rightColWidth / 2).Render(lipgloss.JoinVertical(lipgloss.Left, fields...))
-		// TODO: связные вычисления, нужно разделить
-		fieldRam := borderStyle.Width(rightColWidth / 2).Height(lipgloss.Height(fieldROM)).Render(lipgloss.JoinVertical(lipgloss.Left, label, strRam))
-
-		right := lipgloss.JoinVertical(lipgloss.Left, head2Style.Render("Параметры"), lipgloss.JoinHorizontal(lipgloss.Left, fieldRam, fieldROM))
+		right := borderStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
+			head2Style.Render("Параметры"),
+			lipgloss.JoinHorizontal(lipgloss.Left, fieldRam, fieldROM),
+			fieldEth,
+			lipgloss.JoinHorizontal(lipgloss.Left, fieldCOM, fieldUSB),
+			fieldStress,
+		))
 
 		// все тело экрана
 		body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
@@ -276,19 +252,6 @@ func (m Model) View() tea.View {
 	v.ForegroundColor = lipgloss.Color(defaultColor)
 
 	return v
-}
-
-type Param struct {
-	Name string 
-	Value string
-}
-
-func paramRow(param Param, width int) string {
-	dots := width - lipgloss.Width(param.Name) - lipgloss.Width(param.Value) - 2
-	if dots < 0 {
-		dots = 0
-	}
-	return fmt.Sprintf("%s %s %s", param.Name, strings.Repeat(".", dots), param.Value)
 }
 
 func genConfString(cfg config.Config) string {
