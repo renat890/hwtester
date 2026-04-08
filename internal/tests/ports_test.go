@@ -16,7 +16,7 @@ type mockCOMTest struct {
 	err error
 }
 
-func (m *mockCOMTest) EchoTest(ctx context.Context, logCh chan string) (COMInfo, error) {
+func (m *mockCOMTest) EchoTest(ctx context.Context, logCh chan hw.LogMsg) (COMInfo, error) {
 	return m.info, m.err
 }
 
@@ -52,7 +52,7 @@ func TestCOM(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			testCOM := NewTestCOM(&mockCOMTest{info: tC.comInfo}, confPorts)
-			actual := testCOM.Run(ctx, make(chan string))
+			actual := testCOM.Run(ctx, make(chan hw.LogMsg))
 			assert.Equal(t, tC.expected, actual.Status)
 		})
 	}
@@ -63,7 +63,7 @@ func TestCOMError(t *testing.T) {
 	defer cancel()
 
 	testCOM := NewTestCOM(&mockCOMTest{err: errors.New("hardware error")}, confPorts)
-	actual := testCOM.Run(ctx, make(chan string))
+	actual := testCOM.Run(ctx, make(chan hw.LogMsg))
 	assert.Equal(t, hw.Error, actual.Status)
 }
 
@@ -74,7 +74,7 @@ type mockEthernetsInfo struct {
 	err error
 }
 
-func (m *mockEthernetsInfo) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan string) (PortsInfo, error) {
+func (m *mockEthernetsInfo) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan hw.LogMsg) (PortsInfo, error) {
 	return m.pi, m.err
 }
 
@@ -103,7 +103,7 @@ func TestEthernets(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			testEthernets := NewEthernetsTest(&mockEthernetsInfo{pi: tC.portsInfo}, confPorts)
-			actual := testEthernets.Run(ctx, make(chan string))
+			actual := testEthernets.Run(ctx, make(chan hw.LogMsg))
 			assert.Equal(t, tC.expected, actual.Status)
 		})
 	}
@@ -114,7 +114,7 @@ func TestEthernetsError(t *testing.T) {
 	defer cancel()
 
 	testEthernets := NewEthernetsTest(&mockEthernetsInfo{err: errors.New("hardware error")}, confPorts)
-	actual := testEthernets.Run(ctx, make(chan string))
+	actual := testEthernets.Run(ctx, make(chan hw.LogMsg))
 	assert.Equal(t, hw.Error, actual.Status)
 }
 
@@ -125,7 +125,7 @@ type mockUSBInfo struct {
 	err error
 }
 
-func (m *mockUSBInfo) GetUSBInfo(ctx context.Context, logCh chan string) (USBInfo, error) {
+func (m *mockUSBInfo) GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (USBInfo, error) {
 	return m.ui, m.err
 }
 
@@ -157,7 +157,7 @@ func TestUSB(t *testing.T) {
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			testUSB := NewUSBTest(&mockUSBInfo{ui: tC.usbInfo}, confUSB)
-			actual := testUSB.Run(ctx, make(chan string))
+			actual := testUSB.Run(ctx, make(chan hw.LogMsg))
 			assert.Equal(t, tC.expected, actual.Status)
 		})
 	}
@@ -168,6 +168,6 @@ func TestUSBError(t *testing.T) {
 	defer cancel()
 
 	testUSB := NewUSBTest(&mockUSBInfo{err: errors.New("hardware error")}, confUSB)
-	actual := testUSB.Run(ctx, make(chan string))
+	actual := testUSB.Run(ctx, make(chan hw.LogMsg))
 	assert.Equal(t, hw.Error, actual.Status)
 }

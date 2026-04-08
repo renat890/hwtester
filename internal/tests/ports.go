@@ -29,7 +29,7 @@ type COMTest struct {
 }
 
 type GetterCOMInfo interface {
-	EchoTest(ctx context.Context, logCh chan string) (COMInfo, error) 
+	EchoTest(ctx context.Context, logCh chan hw.LogMsg) (COMInfo, error) 
 }
 
 func NewTestCOM(getterComInfo GetterCOMInfo, conf config.Ports) *COMTest {
@@ -40,7 +40,7 @@ func NewTestCOM(getterComInfo GetterCOMInfo, conf config.Ports) *COMTest {
 	}
 }
 
-func (c *COMTest) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
+func (c *COMTest) Run(ctx context.Context, logCh chan hw.LogMsg) (result hw.TestResult) {
 	start := time.Now()
 	defer func(){
 		result.Duration = time.Since(start)
@@ -88,7 +88,7 @@ type EthernetsTest struct {
 }
 
 type GetterEthernetsInfo interface {
-	GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan string) (PortsInfo, error) 
+	GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan hw.LogMsg) (PortsInfo, error) 
 }
 
 func NewEthernetsTest(getterEthernetsInfo GetterEthernetsInfo, conf config.Ports) *EthernetsTest {
@@ -99,7 +99,7 @@ func NewEthernetsTest(getterEthernetsInfo GetterEthernetsInfo, conf config.Ports
 	}
 }
 
-func (e *EthernetsTest) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
+func (e *EthernetsTest) Run(ctx context.Context, logCh chan hw.LogMsg) (result hw.TestResult) {
 	start := time.Now()
 	defer func ()  {
 		result.Duration = time.Since(start)
@@ -152,7 +152,7 @@ type USBTest struct {
 }
 
 type GetterUSBInfo interface {
-	GetUSBInfo(ctx context.Context, logCh chan string) (USBInfo, error)
+	GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (USBInfo, error)
 }
 
 func NewUSBTest(getterUSBInfo GetterUSBInfo, conf config.USBFlash) *USBTest {
@@ -163,7 +163,7 @@ func NewUSBTest(getterUSBInfo GetterUSBInfo, conf config.USBFlash) *USBTest {
 	}
 }
 
-func (u *USBTest) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
+func (u *USBTest) Run(ctx context.Context, logCh chan hw.LogMsg) (result hw.TestResult) {
 	start := time.Now()
 	defer func ()  {
 		result.Duration = time.Since(start)

@@ -20,7 +20,7 @@ func (m MockTest) Name() string {
 	return m.name
 }
 
-func (m MockTest) Run(ctx context.Context, logCh chan string) hw.TestResult {
+func (m MockTest) Run(ctx context.Context, logCh chan hw.LogMsg) hw.TestResult {
 	if m.cancel != nil {
 		m.cancel()
 	}
@@ -60,7 +60,7 @@ func TestRun(t *testing.T) {
 			defer cancel()
 
 			runner := NewTestRunner()
-			result := runner.Run(ctx, tC.tests, make(chan hw.TestResult, 4), make(chan string, 10))
+			result := runner.Run(ctx, tC.tests, make(chan hw.TestResult, 4), make(chan hw.LogMsg, 10))
 			assert.Equal(t, tC.expected, result)
 		})
 	}
@@ -82,7 +82,7 @@ func TestRunWithCancel(t *testing.T) {
 
 	t.Run("отмена контекста для теста", func(t *testing.T) {
 		runner := NewTestRunner()
-		result := runner.Run(ctx, tests, make(chan hw.TestResult, 4), make(chan string, 10))
+		result := runner.Run(ctx, tests, make(chan hw.TestResult, 4), make(chan hw.LogMsg, 10))
 		assert.Equal(t, expected, result)
 	})
 }

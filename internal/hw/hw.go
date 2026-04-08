@@ -14,9 +14,23 @@ const (
 	Error = Status("Error")
 )
 
+type LogLevel string
+
+const (
+	INFO = LogLevel("info")
+	WARN = LogLevel("warn")
+	ERR  = LogLevel("err")
+)
+
+type LogMsg struct {
+	Level LogLevel
+	Text string
+	Stamp time.Time
+}
+
 type HWTest interface {
 	Name() string
-	Run(ctx context.Context, logCh chan string) TestResult
+	Run(ctx context.Context, logCh chan LogMsg) TestResult
 }
 
 type TestResult struct {

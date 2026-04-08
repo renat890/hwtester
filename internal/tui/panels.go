@@ -144,9 +144,14 @@ func currentTestsPanel(res []hw.TestResult, current, spinner string, width int) 
 	)
 }
 
-func logsPanel(logs []string, width int) string {
+func logsPanel(logs []hw.LogMsg, width int) string {
 	label := head2Style.Render("ЛОГ ВЫПОЛНЕНИЯ")
-	logsField := lipgloss.JoinVertical(lipgloss.Left, logs...)	
+
+	logsStr := make([]string, len(logs))
+	for i := range logs {
+		logsStr[i] = fmt.Sprintf("%v %s %s", logs[i].Stamp, logs[i].Level, logs[i].Text)
+	}
+	logsField := lipgloss.JoinVertical(lipgloss.Left, logsStr...)	
 
 
 	return borderStyle.Width(width).Render(lipgloss.JoinVertical(lipgloss.Left, label, logsField))

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"factorytest/internal/config"
+	"factorytest/internal/hw"
 	"fmt"
 	"math"
 	"net"
@@ -200,7 +201,7 @@ func toMbPerSec(bytes int, nanoSec int64) float64 {
 	return mb / sec
 }
 
-func (h *HardwareUsage) Load(ctx context.Context, dur time.Duration, logCh chan string) (CpuInfo, error) {
+func (h *HardwareUsage) Load(ctx context.Context, dur time.Duration, logCh chan hw.LogMsg) (CpuInfo, error) {
 	ch := make(chan []sensors.TemperatureStat)
 
 	infoT, err := sensors.SensorsTemperatures()
@@ -268,8 +269,13 @@ func getCpuName() string {
 	return info[0].ModelName
 }
 
-func load(ctx context.Context, worker int, logCh chan string) {
-	logCh <- fmt.Sprintf("Запущен worker с номером - %d", worker)
+func load(ctx context.Context, worker int, logCh chan hw.LogMsg) {
+	logCh <- hw.LogMsg{
+		Level: hw.INFO,
+		Text: fmt.Sprintf("Запущен worker с номером - %d", worker),
+		Stamp: time.Now(),
+	}
+		
 	var i int64
 	workLoad:
 	for {
@@ -283,11 +289,19 @@ func load(ctx context.Context, worker int, logCh chan string) {
 			}
 		}
 	}
-	logCh <- fmt.Sprintf("Остановлен worker с номером - %d", worker)
+	logCh <- hw.LogMsg{
+		Level: hw.INFO,
+		Text: fmt.Sprintf("Остановлен worker с номером - %d", worker),
+		Stamp: time.Now(),
+	}
 }
 
-func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat, logCh chan string) {
-	logCh <- fmt.Sprint("Запущен сборщик показаний температуры")
+func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat, logCh chan hw.LogMsg) {
+	logCh <- hw.LogMsg{
+		Level: hw.INFO,
+		Text: "Запущен сборщик показаний температуры",
+		Stamp: time.Now(),
+	}
 	attempt := 1
 	getter:
 	for {
@@ -298,7 +312,11 @@ func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.T
 		default:
 			info, err := sensors.SensorsTemperatures()
 			if err != nil {
-				logCh <- fmt.Sprintf("ошибка опроса датчика температуры, попытка №%d", attempt)
+				logCh <- hw.LogMsg{
+					Level: hw.WARN,
+					Text: fmt.Sprintf("ошибка опроса датчика температуры, попытка №%d", attempt),
+					Stamp: time.Now(),
+				}
 				attempt++
 				continue
 			} 
@@ -306,7 +324,11 @@ func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.T
 		}
 		time.Sleep(freq)
 	}
-	logCh <- fmt.Sprint("Остановлен сборщик показаний температуры")
+	logCh <- hw.LogMsg{
+		Level: hw.INFO,
+		Text: "Остановлен сборщик показаний температуры",
+		Stamp: time.Now(),
+	}
 }
 
 const corePattern = "coretemp"
@@ -357,13 +379,17 @@ func getAvgTemp(info []sensors.TemperatureStat) (float64, error) {
 // для COM портов
 const msg = "test com this big message and very big message abracodabra stop"
 
-func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan string) (COMInfo, error) {
+func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan hw.LogMsg) (COMInfo, error) {
 	ports, err := serial.GetPortsList()
 	if err != nil {
 		return COMInfo{}, errors.New("Не удалось получить COM порты")
 	}
 	for _, port := range ports {
-		logCh <- fmt.Sprintf("Найден порт: %v", port)
+		logCh <- hw.LogMsg{
+			Level: hw.INFO,
+			Text: fmt.Sprintf("Найден порт: %v", port),
+			Stamp: time.Now(),
+		}
 	}
 	if len(ports) < 2 {
 		return COMInfo{}, errors.New("нет минимального количества портов COM")
@@ -385,9 +411,19 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan string) (COMInf
 		tests = true
 		ctx, cancel := context.WithTimeout(ctx, 2 * time.Second)
 
-		logCh <- fmt.Sprintf("%d попытка прохождения теста с COM-портами", i+1)
+		logCh <- hw.LogMsg{
+			Level: hw.INFO,
+			Text: fmt.Sprintf("%d попытка прохождения теста с COM-портами", i+1),
+			Stamp: time.Now(),
+		}
+
 		for rPort, wPort := range pairs {
-			logCh <- fmt.Sprintf("Тестирование пары rPort %s, wPort %s", rPort, wPort)
+			logCh <- hw.LogMsg{
+				Level: hw.INFO,
+				Text: fmt.Sprintf("Тестирование пары rPort %s, wPort %s", rPort, wPort),
+				Stamp: time.Now(),
+			}
+
 			wg.Add(2)
 			go func(r string)  {
 				defer wg.Done()
@@ -408,7 +444,11 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan string) (COMInf
 		if tests {
 			break
 		} else {
-			logCh <- fmt.Sprint("Неудачная попытка прохождения теста. Перезапускаю тест.")
+			logCh <- hw.LogMsg{
+				Level: hw.WARN,
+				Text: "Неудачная попытка прохождения теста. Перезапускаю тест.",
+				Stamp: time.Now(),
+			}
 		}
 	}
 
@@ -419,25 +459,37 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan string) (COMInf
 	return final, nil
 }
 
-func portRead(ctx context.Context, name string, ch chan bool, logCh chan string) {
+func portRead(ctx context.Context, name string, ch chan bool, logCh chan hw.LogMsg) {
 	port, err := serial.Open(name, &serial.Mode{
 		BaudRate: 115200,
 	})
 	if err != nil {
-		logCh <- fmt.Sprint(err)
+		logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 		ch <- false
 		return
 	}
 	defer port.Close()
 
 	if err := port.SetReadTimeout(500 * time.Millisecond); err !=  nil {
-		logCh <- fmt.Sprint(err)
+		logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 		ch <- false
 		return
 	}
 
 	if err := port.ResetInputBuffer(); err != nil {
-		logCh <- fmt.Sprint(err)
+		logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 		ch <- false
 		return
 	}
@@ -445,7 +497,11 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan string)
 	var final strings.Builder
 	buf := make([]byte, 8)
 	numMsg := 1 
-	logCh <- fmt.Sprintf("Запущен порт читатель rPort %", name)
+	logCh <- hw.LogMsg{
+		Level: hw.INFO,
+		Text: fmt.Sprintf("Запущен порт читатель rPort %s", name),
+		Stamp: time.Now(),
+	}
 	reader:
 	for {
 		select {
@@ -455,7 +511,11 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan string)
 		default:
 			n, err := port.Read(buf)
 			if err != nil {
-				logCh <- fmt.Sprintf("Ошибка чтения из COM-порта: %s", err.Error())
+				logCh <- hw.LogMsg{
+					Level: hw.WARN,
+					Text: fmt.Sprintf("Ошибка чтения из COM-порта: %s", err.Error()),
+					Stamp: time.Now(),
+				}
 			}
 			numMsg++
 			if n == 0 {
@@ -474,27 +534,39 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan string)
 	}
 }
 
-func portWrite(ctx context.Context, name string, logCh chan string) {
+func portWrite(ctx context.Context, name string, logCh chan hw.LogMsg) {
 	port, err := serial.Open(name, &serial.Mode{
 		BaudRate: 115200,
 	})
 	if err != nil {
-		logCh <- fmt.Sprint(err)
+		logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 		return
 	}
 	defer port.Close()
-	logCh <- fmt.Sprintf("Запущен порт писатель wPort %s", name)
+	logCh <- hw.LogMsg{
+		Level: hw.INFO,
+		Text: fmt.Sprintf("Запущен порт писатель wPort %s", name),
+		Stamp: time.Now(),
+	}
 	if ctx.Err() != nil {
 		return
 	}
 	_, err = port.Write(([]byte(msg)))
 	if err != nil {
-		logCh <- fmt.Sprintf("Ошибка записи в COM-порт: %s", err.Error())
+		logCh <- hw.LogMsg{
+			Level: hw.WARN,
+			Text: fmt.Sprintf("Ошибка записи в COM-порт: %s", err.Error()),
+			Stamp: time.Now(),
+		}
 	}
 }
 
 // для работы с флешками
-func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan string) (USBInfo, error) {
+func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (USBInfo, error) {
 	// TODO: вынести в конфигурационный файл размер флешки
 	const sizeInMB int = 8000
 	disks, err := scsiDevices()
@@ -516,20 +588,32 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan string) (USBI
 	for _, diskName := range diskNames {
 		disk, err := diskfs.Open(diskName)
 		if err != nil {
-			logCh <- fmt.Sprint(err)
+			logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 			continue
 		}
 
 		fs, err := disk.GetFilesystem(1)
 		if err != nil {
-			logCh <- fmt.Sprint(err)
+			logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 			disk.Close()
 			continue
 		}
 
 		b, err := fs.ReadFile(testFileName)
 		if err != nil {
-			logCh <- fmt.Sprint("Не удалось прочитать файл")
+			logCh <- hw.LogMsg{
+				Level: hw.ERR,
+				Text: "Не удалось прочитать файл",
+				Stamp: time.Now(),
+			}
 			disk.Close()
 			continue
 		}
@@ -542,7 +626,11 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan string) (USBI
 		}
 
 		if err = disk.Close(); err != nil {
-			logCh <- fmt.Sprintf("ошибка закрытия флешки: %s", err.Error())
+			logCh <- hw.LogMsg{
+				Level: hw.ERR,
+				Text: fmt.Sprintf("ошибка закрытия флешки: %s", err.Error()),
+				Stamp: time.Now(),
+			}
 		}
 	}
 
@@ -613,7 +701,7 @@ func runCmd(cmd string) error {
 	return err
 }
 
-func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan string) (PortsInfo, error) {
+func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan hw.LogMsg) (PortsInfo, error) {
 	portsInfoRes := PortsInfo{}
 	// Загружаю все возможные шаблоны
 	tmpls, err := loadTemplates()
@@ -655,22 +743,38 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			// перед запуском тестов на порту для каждого клиента
 			cmd.Reset()
 			if err = tmpls["preEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name, IP: client.Ip}); err != nil {
-				logCh <- fmt.Sprint(err)
+				logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 				return 
 			}
 			if err = runCmd(cmd.String()); err != nil {
-				logCh <- fmt.Sprint(err)
+				logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 				return 
 			}
 			// в конце каждого теста
 			defer func ()  {
 				cmd.Reset()
 				if err = tmpls["postEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name}); err != nil {
-					logCh <- fmt.Sprint(err)
+					logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 					return  
 				}
 				if err = runCmd(cmd.String()); err != nil {
-					logCh <- fmt.Sprint(err)
+					logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 				}
 			}()
 
@@ -684,20 +788,23 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			cmd.Reset()
 			// TODO: законфижить путь до бинарника отрпавителя
 			if err = runCmd(fmt.Sprintf("ip netns exec %s ./eth-util --mode=client --ip=%s", nameNetNamespace, server.Ip)); err != nil {
-				logCh <- fmt.Sprint(err)
+				logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 			}
 
 			actual := <- result
 			if actual != expectedCount {
-				logCh <- fmt.Sprint("Для пары тест сетевых портов провален")
-				logCh <- fmt.Sprint("Получено пакетов: ", actual)
+				logCh <- hw.LogMsg{
+					Level: hw.ERR,
+					Text: fmt.Sprintf("Для пары тест сетевых портов провален. Получено пакетов: %d", actual),
+				}
 				portsInfoRes.PacketsLoss += (expectedCount - actual)
 			}
 			portsInfoRes.Ports = append(portsInfoRes.Ports, server.Name)
 		}()
-		
-		
-		
 	}
 
 	// выполняю действия после тестов сетевых интерфейсов
@@ -718,17 +825,25 @@ const (
 	expectedCount = 1_000
 )
 
-func listen(ctx context.Context, result chan int, ip, port string, logCh chan string) {
+func listen(ctx context.Context, result chan int, ip, port string, logCh chan hw.LogMsg) {
 	address := fmt.Sprintf("%s:%s", ip, port)
 	conn, err := net.ListenPacket("udp", address)
 	if err != nil {
-		logCh <- fmt.Sprint(err)
+		logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: err.Error(),
+			Stamp: time.Now(),
+		}
 		result <- 0
 		return
 	}
 	defer conn.Close()
 	if err = conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		logCh <- fmt.Sprint("Не удалось установить дедлайн на чтение")
+		logCh <- hw.LogMsg{
+			Level: hw.ERR,
+			Text: "Не удалось установить дедлайн на чтение",
+			Stamp: time.Now(),
+		}
 		result <- 0
 		return
 	}

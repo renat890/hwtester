@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -43,7 +44,7 @@ type AllDoneMsg struct {
 }
 
 type ModelRunner interface {
-	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan string) []hw.TestResult
+	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan hw.LogMsg) []hw.TestResult
 }
 
 type Model struct {
@@ -54,8 +55,8 @@ type Model struct {
 	results        []hw.TestResult
 	cancel         context.CancelFunc
 	final          hw.Status
-	logs           []string
-	logCh          chan string
+	logs           []hw.LogMsg
+	logCh          chan hw.LogMsg
 	currentTest    string
 	currentTestIdx int
 	spin           spinner.Model
@@ -71,8 +72,7 @@ func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest, version
 		cfg:           cfg,
 		mRunner:       mRunner,
 		tests:         tests,
-		logs:          []string{},
-		// currentTest: test,
+		logs:          []hw.LogMsg{},
 		spin: spinner.New(
 			spinner.WithSpinner(spinner.Points),
 			spinner.WithStyle(spinnerStyle),
@@ -109,7 +109,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.currentScreen = runScreen
 			m.ch = make(chan hw.TestResult)
-			m.logCh = make(chan string, 100)
+			m.logCh = make(chan hw.LogMsg, 100)
 			ctx, cancel := context.WithCancel(context.Background())
 			m.cancel = cancel
 			go func() {
@@ -146,15 +146,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.results = append(m.results, msg.Result)
 		return m, m.waitForResult(m.ch)
-	case LogMsg:
-		m.logs = append(m.logs, string(msg))
+	case hw.LogMsg:
+		m.logs = append(m.logs, msg)
 		// тут перестроение буфера для логов
 		if tmp := len(m.logs); tmp > logsSize {
 			m.logs = m.logs[tmp-logsSize:]
 		}
 		return m, m.waitForLog(m.logCh)
 	case LastLogMsg:
-		m.logs = append(m.logs, string(msg))
+		last := hw.LogMsg{Level: hw.INFO, Text: string(msg), Stamp: time.Now()}
+		m.logs = append(m.logs, last)
 		// тут перестроение буфера для логов
 		if tmp := len(m.logs); tmp > logsSize {
 			m.logs = m.logs[tmp-logsSize:]
@@ -207,7 +208,7 @@ func (m Model) View() tea.View {
 		left := testsPanel(m.tests, lipgloss.Height(right))
 		// все тело экрана
 		body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-		
+
 		footer := "Enter - запустить q - выход"
 		s.WriteString(lipgloss.JoinVertical(lipgloss.Left, title, body, footer))
 	case runScreen:
@@ -219,6 +220,7 @@ func (m Model) View() tea.View {
 
 		// Блок с текущими тестами
 		// TODO: подумать с шириной левого блока, пока константа
+		
 		left := currentTestsPanel(m.results, m.tests[m.currentTestIdx].Name(), m.spin.View(), minLeftColWidth)
 		// блок с логам
 		right := logsPanel(m.logs, m.width)
@@ -304,15 +306,14 @@ func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {
 	}
 }
 
-type LogMsg string
 type LastLogMsg string
 
-func (m Model) waitForLog(ch chan string) tea.Cmd {
+func (m Model) waitForLog(ch chan hw.LogMsg) tea.Cmd {
 	return func() tea.Msg {
 		str, ok := <-ch
 		if !ok {
 			return LastLogMsg("Тестирование окончено")
 		}
-		return LogMsg(str)
+		return hw.LogMsg(str)
 	}
 }

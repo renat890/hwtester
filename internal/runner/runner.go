@@ -11,7 +11,7 @@ func NewTestRunner() *runner {
 	return &runner{}
 }
 
-func (r *runner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan string) []hw.TestResult {
+func (r *runner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan hw.LogMsg) []hw.TestResult {
 	result := []hw.TestResult{}
 
 	for _, test := range tests {

@@ -16,7 +16,7 @@ type CpuInfo struct {
 }
 
 type StressInfoGetter interface {
-	Load(ctx context.Context, dur time.Duration, logCh chan string) (CpuInfo, error)
+	Load(ctx context.Context, dur time.Duration, logCh chan hw.LogMsg) (CpuInfo, error)
 }
 
 type CPU struct {
@@ -33,7 +33,7 @@ func NewTestCPU(sig StressInfoGetter, cfg config.Stress) *CPU {
 	}
 }
 
-func (c *CPU) Run(ctx context.Context, logCh chan string) (result hw.TestResult) {
+func (c *CPU) Run(ctx context.Context, logCh chan hw.LogMsg) (result hw.TestResult) {
 	start := time.Now()
 	result.Name = c.name
 	result.Status = hw.Pass
