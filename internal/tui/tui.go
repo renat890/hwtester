@@ -10,7 +10,6 @@ import (
 	"slices"
 	"strings"
 	"text/template"
-	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -163,10 +162,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logs = m.logs[tmp - logsSize:]
 		}
 		return m, m.waitForLog(m.logCh)
+	case LastLogMsg:
+		m.logs = append(m.logs, string(msg))
+		// тут перестроение буфера для логов
+		if tmp := len(m.logs); tmp > logsSize {
+			m.logs = m.logs[tmp - logsSize:]
+		}
+		return m, nil
 	case AllDoneMsg:
 		m.currentScreen = resultScreen
-		// TODO: заменить на продолжение при помощи нажатия клавиши
-		time.Sleep(1 * time.Second) // УБРАТЬ!
 		// остановка спиннера
 		m.spin = spinner.New()
 		m.final = msg.Final
@@ -189,14 +193,11 @@ func (m Model) View() tea.View {
 		s.Reset()
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s - стартовая конфигурация", m.version))
 
-		// формирование блока с тестами
-		left := testsPanel(m.tests)
-
 		fieldROM := romPanel(m.cfg.ROM, rightColWidth / 2)
-		fieldRam := ramPanel(m.cfg.RAM, rightColWidth / 2)
+		fieldRam := ramPanel(m.cfg.RAM, rightColWidth / 2, lipgloss.Height(fieldROM))
 		fieldEth := ethPanel(m.cfg.Ports.Ethernets, rightColWidth)
-		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWidth)
 		fieldUSB := usbPanel(m.cfg.USBFlash, rightColWidth / 2)
+		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWidth / 2, lipgloss.Height(fieldUSB))
 		fieldStress := stressPanel(m.cfg.Stress, rightColWidth)
 
 		right := borderStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
@@ -206,6 +207,9 @@ func (m Model) View() tea.View {
 			lipgloss.JoinHorizontal(lipgloss.Left, fieldCOM, fieldUSB),
 			fieldStress,
 		))
+
+		// формирование блока с тестами
+		left := testsPanel(m.tests, lipgloss.Height(right))
 
 		// все тело экрана
 		body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
@@ -229,7 +233,7 @@ func (m Model) View() tea.View {
 		tmplBuilder.WriteString(head2Style.Render("Ход тестирования 68хх:"))
 		tmplBuilder.WriteString("\n\n")
 		for _, val := range m.results {
-			tmplBuilder.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, styledStatus(val.Status)))
+			tmplBuilder.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, statusWithStyle(val.Status)))
 		}
 		tmplBuilder.WriteString(fmt.Sprintf("%s\t%s", m.currentTest, m.spin.View()))
 		runField := borderStyle.Render(tmplBuilder.String())
@@ -243,7 +247,7 @@ func (m Model) View() tea.View {
 
 		s.WriteString("Результаты тестирования:\n")
 		s.WriteString(genResultString(m.results))
-		s.WriteString(fmt.Sprintf("Общий результат: %s\n", styledStatus(m.final)))
+		s.WriteString(fmt.Sprintf("Общий результат: %s\n", statusWithStyle(m.final)))
 	}
 
 	v := tea.NewView(s.String())
@@ -263,7 +267,7 @@ func genConfString(cfg config.Config) string {
 	return buffer.String()
 }
 
-func styledStatus(status hw.Status) hw.Status {
+func statusWithStyle(status hw.Status) string {
 	var newStatus string
 	switch status {
 	case hw.Pass:
@@ -273,26 +277,20 @@ func styledStatus(status hw.Status) hw.Status {
 	case hw.Fail:
 		newStatus = failStyle.Render(string(hw.Fail))
 	}
-	return hw.Status(newStatus)
+	return newStatus
 }
 
 func genResultString(items []hw.TestResult) string {
-	itemsCopy := make([]hw.TestResult, len(items))
-	copy(itemsCopy, items)
-	// делаю результаты разных цветов
-	for i := range itemsCopy {
-		itemsCopy[i].Status = styledStatus(itemsCopy[i].Status )
-	}
-
 	tHeaders := []string{"Имя","Статус","Детали","Метрики"}
 	tRows := [][]string{}
 
-	for _, row := range itemsCopy {
+	for _, row := range items {
 		var metrs strings.Builder
 		for key, val := range row.Metrics {
 			metrs.WriteString(fmt.Sprintf("%s: %v\n", key, val))
 		}
-		tRows = append(tRows, []string{row.Name, string(row.Status), row.Details, metrs.String() })
+		styledStatus := statusWithStyle(row.Status)
+		tRows = append(tRows, []string{row.Name, styledStatus, row.Details, metrs.String() })
 	}
 	
 	t := table.New().
@@ -333,7 +331,7 @@ func (m Model) waitForLog(ch chan string) tea.Cmd {
 	return func() tea.Msg {
 		str, ok := <- ch
 		if !ok {
-			return LastLogMsg("")
+			return LastLogMsg("Тестирование окончено")
 		}
 		return LogMsg(str)
 	}

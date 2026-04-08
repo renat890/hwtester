@@ -32,18 +32,19 @@ func paramRow(p paramCfg, width int) string {
 	return fmt.Sprintf("%s %s %s", p.Name, strings.Repeat(".", dots), p.Value)
 }
 
-func multiRow(params []paramCfg, label string, width int) string {
+func multiRow(params []paramCfg, label string, width int, height ...int) string {
 	innerWidth := width - 2 * border - 2 * padding
 	fields := []string{label,}
 	for _, param := range params {
 		fields = append(fields, paramRow(param, innerWidth))
 	}
-	return borderStyle.Width(width).Render(lipgloss.JoinVertical(lipgloss.Left, fields...))
+	if len(height) != 1 {
+		return borderStyle.Width(width).Render(lipgloss.JoinVertical(lipgloss.Left, fields...))
+	}
+	return borderStyle.Width(width).Height(height[0]).Render(lipgloss.JoinVertical(lipgloss.Left, fields...))
 }
 
-func testsPanel(tests []hw.HWTest) string {
-	// для выравнивания с левым блоком
-	const heightTests = 30
+func testsPanel(tests []hw.HWTest, heights ...int) string {
 	rows := []string{head2Style.Render("ТЕСТЫ К ЗАПУСКУ"),}
 	for _, t := range tests {
 		rows = append(rows, fmt.Sprintf("%s %s", checkMark, t.Name()))
@@ -51,25 +52,22 @@ func testsPanel(tests []hw.HWTest) string {
 	itog := fmt.Sprintf("Итого: %d тестов", len(tests))
 	rows = append(rows, "", itog)
 	left := lipgloss.JoinVertical(lipgloss.Left, rows...)
-	left = borderStyle.Width(leftColWidth).Height(heightTests).Render(left)
-	return left
+	if len(heights) != 1 {
+		return  borderStyle.Width(leftColWidth).Render(left)
+	}
+	return  borderStyle.Width(leftColWidth).Height(heights[0]).Render(left)
 }
 
-func ramPanel(cfg config.RAM, width int) string {
-	// для выравнивания с ПЗУ
-	const heightRam = 7
+func ramPanel(cfg config.RAM, width int, height ...int) string {
 	label := head2Style.Render("ОЗУ")
-
-	innerWidth := width / 2 - 2 * border - 2 * padding
-	strRam := paramRow(paramCfg{"Объем, Мб", strconv.Itoa(cfg.ValueMB)}, innerWidth)
-
-	return borderStyle.Width(width / 2).Height(heightRam).
-	Render(lipgloss.JoinVertical(lipgloss.Left, label, strRam))
+	cfgRAM := []paramCfg{
+		{"Объем, Мб", strconv.Itoa(cfg.ValueMB)},
+	}
+	return multiRow(cfgRAM, label, width, height...)
 }
 
 func romPanel(cfg config.ROM, width int) string {
 	label := head2Style.Render("ПЗУ")
-
 	cfgROM := []paramCfg{
 		{"Дисков", fmt.Sprintf("%d", cfg.Nums)},
 		{"Объем диска", fmt.Sprintf("%d", cfg.ValueMBEach)},
@@ -94,23 +92,20 @@ func ethPanel(ports []config.Ethernet , width int) string {
 		Width(innerWidth).
 		BorderBottom(false).BorderColumn(false).BorderLeft(false).BorderRight(false).BorderTop(false)
 	
-	field := borderStyle.Width(rightColWidth).Render(
+	field := borderStyle.Width(width).Render(
 		lipgloss.JoinVertical(lipgloss.Left, label, t.Render()),
 	)
 
 	return field
 }
 
-func comPanel(coms []string, width int) string {
-	// для выравнивания с USB 
-	const heightCOM = 5
+func comPanel(coms []string, width int, heights ...int) string {
 	label := head2Style.Render("COM")
 	tmp := strings.Join(coms, " | ")
-	field := borderStyle.Width(rightColWidth / 2).Height(heightCOM).Render(
-		lipgloss.JoinVertical(lipgloss.Left, label, tmp),
-	)
-
-	return field
+	if len(heights) != 1 {
+		return borderStyle.Width(width).Render(lipgloss.JoinVertical(lipgloss.Left, label, tmp))
+	}
+	return borderStyle.Width(width).Height(heights[0]).Render(lipgloss.JoinVertical(lipgloss.Left, label, tmp))
 }
 
 func usbPanel(cfg config.USBFlash, width int) string {
