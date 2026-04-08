@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	leftColWidth = 30
-	rightColWidth = 80
+	minLeftColWidth = 40
+	minRightColWidth = 80
 	minColHeight = 30
 
 	checkMark = "✓"
@@ -53,9 +53,9 @@ func testsPanel(tests []hw.HWTest, heights ...int) string {
 	rows = append(rows, "", itog)
 	left := lipgloss.JoinVertical(lipgloss.Left, rows...)
 	if len(heights) != 1 {
-		return  borderStyle.Width(leftColWidth).Render(left)
+		return  borderStyle.Width(minLeftColWidth).Render(left)
 	}
-	return  borderStyle.Width(leftColWidth).Height(heights[0]).Render(left)
+	return  borderStyle.Width(minLeftColWidth).Height(heights[0]).Render(left)
 }
 
 func ramPanel(cfg config.RAM, width int, height ...int) string {

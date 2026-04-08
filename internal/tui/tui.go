@@ -62,7 +62,8 @@ type Model struct {
 	logCh         chan string
 	currentTest   string
 	spin          spinner.Model
-	version string      
+	version string    
+	width int  
 
 	tests []hw.HWTest
 }
@@ -100,6 +101,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// TODO: сделать зависимой от размера экрана
 	const logsSize = 20
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		return m, nil
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "q":
@@ -192,13 +196,18 @@ func (m Model) View() tea.View {
 	case startScreen:
 		s.Reset()
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s - стартовая конфигурация", m.version))
+		
+		rightColWith := m.width / 3 * 2
+		if rightColWith < minRightColWidth {
+			rightColWith = minRightColWidth
+		}
 
-		fieldROM := romPanel(m.cfg.ROM, rightColWidth / 2)
-		fieldRam := ramPanel(m.cfg.RAM, rightColWidth / 2, lipgloss.Height(fieldROM))
-		fieldEth := ethPanel(m.cfg.Ports.Ethernets, rightColWidth)
-		fieldUSB := usbPanel(m.cfg.USBFlash, rightColWidth / 2)
-		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWidth / 2, lipgloss.Height(fieldUSB))
-		fieldStress := stressPanel(m.cfg.Stress, rightColWidth)
+		fieldROM := romPanel(m.cfg.ROM, rightColWith / 2)
+		fieldRam := ramPanel(m.cfg.RAM, rightColWith / 2, lipgloss.Height(fieldROM))
+		fieldEth := ethPanel(m.cfg.Ports.Ethernets, rightColWith)
+		fieldUSB := usbPanel(m.cfg.USBFlash, rightColWith / 2)
+		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWith / 2, lipgloss.Height(fieldUSB))
+		fieldStress := stressPanel(m.cfg.Stress, rightColWith)
 
 		right := borderStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
 			head2Style.Render("Параметры"),
