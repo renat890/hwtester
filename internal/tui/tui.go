@@ -7,7 +7,6 @@ import (
 	"factorytest/internal/config"
 	"factorytest/internal/hw"
 	"fmt"
-	"slices"
 	"strings"
 	"text/template"
 
@@ -61,6 +60,7 @@ type Model struct {
 	logs 		  []string
 	logCh         chan string
 	currentTest   string
+	currentTestIdx int
 	spin          spinner.Model
 	version string    
 	width int  
@@ -69,10 +69,10 @@ type Model struct {
 }
 
 func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest, version string) Model {
-	var cur string
-	if len(tests) > 0 {
-		cur = tests[0].Name()
-	}
+	// var cur string
+	// if len(tests) > 0 {
+	// 	cur = tests[0].Name()
+	// }
 
 	return Model{
 		currentScreen: startScreen,
@@ -80,7 +80,7 @@ func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest, version
 		mRunner:       mRunner,
 		tests:         tests,
 		logs: []string{},
-		currentTest: cur,
+		// currentTest: test,
 		spin: spinner.New(
 			spinner.WithSpinner(spinner.Points),
 			spinner.WithStyle(spinnerStyle),
@@ -147,16 +147,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case TestDoneMsg:
 		// тут ещё и указываем тест, который выполняется в текущий момент
-		var curInd int
-		if len(m.tests) != 0 {
-			curInd = slices.IndexFunc(m.tests, func(t hw.HWTest) bool {
-				return t.Name() == m.currentTest
-			})
+		if m.currentTestIdx < (len(m.tests) - 1) {
+			m.currentTestIdx++
 		}
-		if curInd < (len(m.tests) - 1)  {
-			m.currentTest = m.tests[curInd + 1].Name()
-		}
-
+		
 		m.results = append(m.results, msg.Result)
 		return m, m.waitForResult(m.ch)
 	case LogMsg:
@@ -244,7 +238,7 @@ func (m Model) View() tea.View {
 		for _, val := range m.results {
 			tmplBuilder.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, statusWithStyle(val.Status)))
 		}
-		tmplBuilder.WriteString(fmt.Sprintf("%s\t%s", m.currentTest, m.spin.View()))
+		tmplBuilder.WriteString(fmt.Sprintf("%s\t%s", m.tests[m.currentTestIdx].Name(), m.spin.View()))
 		runField := borderStyle.Render(tmplBuilder.String())
 
 		// объединение в 2 столбца
