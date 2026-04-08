@@ -269,7 +269,7 @@ func getCpuName() string {
 }
 
 func load(ctx context.Context, worker int, logCh chan string) {
-	logCh <- fmt.Sprintf("Запущен worker с номером - %d\n", worker)
+	logCh <- fmt.Sprintf("Запущен worker с номером - %d", worker)
 	var i int64
 	workLoad:
 	for {
@@ -283,7 +283,7 @@ func load(ctx context.Context, worker int, logCh chan string) {
 			}
 		}
 	}
-	logCh <- fmt.Sprintf("Остановлен worker с номером - %d\n", worker)
+	logCh <- fmt.Sprintf("Остановлен worker с номером - %d", worker)
 }
 
 func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat, logCh chan string) {
@@ -298,7 +298,7 @@ func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.T
 		default:
 			info, err := sensors.SensorsTemperatures()
 			if err != nil {
-				logCh <- fmt.Sprintf("ошибка опроса датчика температуры, попытка №%d\n", attempt)
+				logCh <- fmt.Sprintf("ошибка опроса датчика температуры, попытка №%d", attempt)
 				attempt++
 				continue
 			} 
@@ -363,7 +363,7 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan string) (COMInf
 		return COMInfo{}, errors.New("Не удалось получить COM порты")
 	}
 	for _, port := range ports {
-		logCh <- fmt.Sprintf("Найден порт: %v\n", port)
+		logCh <- fmt.Sprintf("Найден порт: %v", port)
 	}
 	if len(ports) < 2 {
 		return COMInfo{}, errors.New("нет минимального количества портов COM")
@@ -385,9 +385,9 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan string) (COMInf
 		tests = true
 		ctx, cancel := context.WithTimeout(ctx, 2 * time.Second)
 
-		logCh <- fmt.Sprintf("%d попытка прохождения теста с COM-портами\n", i+1)
+		logCh <- fmt.Sprintf("%d попытка прохождения теста с COM-портами", i+1)
 		for rPort, wPort := range pairs {
-			logCh <- fmt.Sprintf("Тестирование пары rPort %s, wPort %s\n", rPort, wPort)
+			logCh <- fmt.Sprintf("Тестирование пары rPort %s, wPort %s", rPort, wPort)
 			wg.Add(2)
 			go func(r string)  {
 				defer wg.Done()
@@ -445,7 +445,7 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan string)
 	var final strings.Builder
 	buf := make([]byte, 8)
 	numMsg := 1 
-	logCh <- fmt.Sprintf("Запущен порт читатель rPort %s\n", name)
+	logCh <- fmt.Sprintf("Запущен порт читатель rPort %", name)
 	reader:
 	for {
 		select {
@@ -455,7 +455,7 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan string)
 		default:
 			n, err := port.Read(buf)
 			if err != nil {
-				logCh <- fmt.Sprintf("Ошибка чтения из COM-порта: %s\n", err.Error())
+				logCh <- fmt.Sprintf("Ошибка чтения из COM-порта: %s", err.Error())
 			}
 			numMsg++
 			if n == 0 {
@@ -483,13 +483,13 @@ func portWrite(ctx context.Context, name string, logCh chan string) {
 		return
 	}
 	defer port.Close()
-	logCh <- fmt.Sprintf("Запущен порт писатель wPort %s\n", name)
+	logCh <- fmt.Sprintf("Запущен порт писатель wPort %s", name)
 	if ctx.Err() != nil {
 		return
 	}
 	_, err = port.Write(([]byte(msg)))
 	if err != nil {
-		logCh <- fmt.Sprintf("Ошибка записи в COM-порт: %s\n", err.Error())
+		logCh <- fmt.Sprintf("Ошибка записи в COM-порт: %s", err.Error())
 	}
 }
 
@@ -542,7 +542,7 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan string) (USBI
 		}
 
 		if err = disk.Close(); err != nil {
-			logCh <- fmt.Sprintf("ошибка закрытия флешки: %s\n", err.Error())
+			logCh <- fmt.Sprintf("ошибка закрытия флешки: %s", err.Error())
 		}
 	}
 

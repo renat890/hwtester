@@ -205,10 +205,9 @@ func (m Model) View() tea.View {
 
 		// формирование блока с тестами
 		left := testsPanel(m.tests, lipgloss.Height(right))
-
 		// все тело экрана
 		body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-
+		
 		footer := "Enter - запустить q - выход"
 		s.WriteString(lipgloss.JoinVertical(lipgloss.Left, title, body, footer))
 	case runScreen:
