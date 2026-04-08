@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"factorytest/internal/config"
@@ -31,7 +30,7 @@ const (
 
 const (
 	padding = 1
-	border = 1
+	border  = 1
 )
 
 type TestDoneMsg struct {
@@ -43,43 +42,36 @@ type AllDoneMsg struct {
 	Final   hw.Status
 }
 
-
-
 type ModelRunner interface {
 	Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan string) []hw.TestResult
 }
 
 type Model struct {
-	currentScreen screen
-	cfg           config.Config
-	mRunner       ModelRunner
-	ch            chan hw.TestResult
-	results       []hw.TestResult
-	cancel        context.CancelFunc
-	final         hw.Status
-	logs 		  []string
-	logCh         chan string
-	currentTest   string
+	currentScreen  screen
+	cfg            config.Config
+	mRunner        ModelRunner
+	ch             chan hw.TestResult
+	results        []hw.TestResult
+	cancel         context.CancelFunc
+	final          hw.Status
+	logs           []string
+	logCh          chan string
+	currentTest    string
 	currentTestIdx int
-	spin          spinner.Model
-	version string    
-	width int  
+	spin           spinner.Model
+	version        string
+	width          int
 
 	tests []hw.HWTest
 }
 
 func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest, version string) Model {
-	// var cur string
-	// if len(tests) > 0 {
-	// 	cur = tests[0].Name()
-	// }
-
 	return Model{
 		currentScreen: startScreen,
 		cfg:           cfg,
 		mRunner:       mRunner,
 		tests:         tests,
-		logs: []string{},
+		logs:          []string{},
 		// currentTest: test,
 		spin: spinner.New(
 			spinner.WithSpinner(spinner.Points),
@@ -137,8 +129,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}()
 			}
 			if m.logCh != nil {
-				go func ()  {
-					for range m.logCh {}	
+				go func() {
+					for range m.logCh {
+					}
 				}()
 			}
 
@@ -150,21 +143,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.currentTestIdx < (len(m.tests) - 1) {
 			m.currentTestIdx++
 		}
-		
+
 		m.results = append(m.results, msg.Result)
 		return m, m.waitForResult(m.ch)
 	case LogMsg:
 		m.logs = append(m.logs, string(msg))
 		// тут перестроение буфера для логов
 		if tmp := len(m.logs); tmp > logsSize {
-			m.logs = m.logs[tmp - logsSize:]
+			m.logs = m.logs[tmp-logsSize:]
 		}
 		return m, m.waitForLog(m.logCh)
 	case LastLogMsg:
 		m.logs = append(m.logs, string(msg))
 		// тут перестроение буфера для логов
 		if tmp := len(m.logs); tmp > logsSize {
-			m.logs = m.logs[tmp - logsSize:]
+			m.logs = m.logs[tmp-logsSize:]
 		}
 		return m, nil
 	case AllDoneMsg:
@@ -188,19 +181,18 @@ func (m Model) View() tea.View {
 
 	switch m.currentScreen {
 	case startScreen:
-		s.Reset()
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s - стартовая конфигурация", m.version))
-		
+
 		rightColWith := m.width / 3 * 2
 		if rightColWith < minRightColWidth {
 			rightColWith = minRightColWidth
 		}
 
-		fieldROM := romPanel(m.cfg.ROM, rightColWith / 2)
-		fieldRam := ramPanel(m.cfg.RAM, rightColWith / 2, lipgloss.Height(fieldROM))
+		fieldROM := romPanel(m.cfg.ROM, rightColWith/2)
+		fieldRam := ramPanel(m.cfg.RAM, rightColWith/2, lipgloss.Height(fieldROM))
 		fieldEth := ethPanel(m.cfg.Ports.Ethernets, rightColWith)
-		fieldUSB := usbPanel(m.cfg.USBFlash, rightColWith / 2)
-		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWith / 2, lipgloss.Height(fieldUSB))
+		fieldUSB := usbPanel(m.cfg.USBFlash, rightColWith/2)
+		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWith/2, lipgloss.Height(fieldUSB))
 		fieldStress := stressPanel(m.cfg.Stress, rightColWith)
 
 		right := borderStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
@@ -221,28 +213,23 @@ func (m Model) View() tea.View {
 		s.WriteString(lipgloss.JoinVertical(lipgloss.Left, title, body, footer))
 	case runScreen:
 		s.Reset()
-		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
+		// TODO: разобщить титул
+		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s 00:00:00 68XX s/n 00000", m.version))
+		progressBar := "Прогресс: ==========___________________________ 2/6 ✔ 1 пройден ✘ 1 ошибка ◑ 1 выполняется ○ 3 ожидают"
 		s.WriteByte(byte('\n'))
 
-		var logBuilder strings.Builder
-		logBuilder.WriteString(head2Style.Render("Лог:"))
-		logBuilder.WriteString("\n\n")
-		logBuilder.WriteString(strings.Join(m.logs, ""))
+		// Блок с текущими тестами
+		// TODO: подумать с шириной левого блока, пока константа
+		left := currentTestsPanel(m.results, m.tests[m.currentTestIdx].Name(), m.spin.View(), minLeftColWidth)
+		// блок с логам
+		right := logsPanel(m.logs, m.width)
 
-		logField := borderStyle.Render(logBuilder.String())
-
-		var tmplBuilder strings.Builder
-
-		tmplBuilder.WriteString(head2Style.Render("Ход тестирования 68хх:"))
-		tmplBuilder.WriteString("\n\n")
-		for _, val := range m.results {
-			tmplBuilder.WriteString(fmt.Sprintf("%s\t%s\n", val.Name, statusWithStyle(val.Status)))
-		}
-		tmplBuilder.WriteString(fmt.Sprintf("%s\t%s", m.tests[m.currentTestIdx].Name(), m.spin.View()))
-		runField := borderStyle.Render(tmplBuilder.String())
-
-		// объединение в 2 столбца
-		s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, runField, logField))
+		s.WriteString(lipgloss.JoinVertical(
+			lipgloss.Left,
+			title,
+			progressBar,
+			lipgloss.JoinHorizontal(lipgloss.Top, left, right)),
+		) 
 	case resultScreen:
 		s.Reset()
 		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
@@ -261,15 +248,6 @@ func (m Model) View() tea.View {
 	return v
 }
 
-func genConfString(cfg config.Config) string {
-	var buffer bytes.Buffer
-	if err := tmplConf.ExecuteTemplate(&buffer, "conf.txt", cfg); err != nil {
-		return "не удалось создать текст конфигурации"
-	}
-
-	return buffer.String()
-}
-
 func statusWithStyle(status hw.Status) string {
 	var newStatus string
 	switch status {
@@ -284,7 +262,7 @@ func statusWithStyle(status hw.Status) string {
 }
 
 func genResultString(items []hw.TestResult) string {
-	tHeaders := []string{"Имя","Статус","Детали","Метрики"}
+	tHeaders := []string{"Имя", "Статус", "Детали", "Метрики"}
 	tRows := [][]string{}
 
 	for _, row := range items {
@@ -293,9 +271,9 @@ func genResultString(items []hw.TestResult) string {
 			metrs.WriteString(fmt.Sprintf("%s: %v\n", key, val))
 		}
 		styledStatus := statusWithStyle(row.Status)
-		tRows = append(tRows, []string{row.Name, styledStatus, row.Details, metrs.String() })
+		tRows = append(tRows, []string{row.Name, styledStatus, row.Details, metrs.String()})
 	}
-	
+
 	t := table.New().
 		Headers(tHeaders...).
 		Rows(tRows...)
@@ -332,7 +310,7 @@ type LastLogMsg string
 
 func (m Model) waitForLog(ch chan string) tea.Cmd {
 	return func() tea.Msg {
-		str, ok := <- ch
+		str, ok := <-ch
 		if !ok {
 			return LastLogMsg("Тестирование окончено")
 		}

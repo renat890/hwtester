@@ -128,3 +128,27 @@ func stressPanel(cfg config.Stress, width int) string {
 
 	return multiRow(stress, label, width)
 }
+
+func currentTestsPanel(res []hw.TestResult, current, spinner string, width int) string {
+	label := head2Style.Render("ХОД ТЕСТИРОВАНИЯ 68ХХ:")
+	tests := make([]string, len(res), len(res) + 1)
+	for i, val := range res {
+		tests[i] = fmt.Sprintf("%s\t%s", val.Name, statusWithStyle(val.Status))
+	}
+	// добавление текущего теста
+	tests = append(tests, fmt.Sprintf("%s\t%s", current, spinner))
+	renderTests := lipgloss.JoinVertical(lipgloss.Left, tests...)
+
+	return borderStyle.Width(width).Render(
+		lipgloss.JoinVertical(lipgloss.Left, label, renderTests),
+	)
+}
+
+func logsPanel(logs []string, width int) string {
+	label := head2Style.Render("ЛОГ ВЫПОЛНЕНИЯ")
+	logsField := lipgloss.JoinVertical(lipgloss.Left, logs...)	
+
+
+	return borderStyle.Width(width).Render(lipgloss.JoinVertical(lipgloss.Left, label, logsField))
+}
+
