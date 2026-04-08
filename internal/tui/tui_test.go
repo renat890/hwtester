@@ -18,7 +18,7 @@ type mockRunner struct {
 	results []hw.TestResult
 }
 
-func (m mockRunner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan string) []hw.TestResult {
+func (m mockRunner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestResult, logCh chan hw.LogMsg) []hw.TestResult {
 	for _, val := range m.results {
 		if ctx.Err() != nil {
 			return m.results
@@ -28,6 +28,19 @@ func (m mockRunner) Run(ctx context.Context, tests []hw.HWTest, ch chan hw.TestR
 	}
 
 	return m.results
+}
+
+type mockTest struct {
+	name string
+	res hw.TestResult
+}
+
+func (m *mockTest) Name() string {
+	return m.name
+}
+
+func (m *mockTest) Run(ctx context.Context, logCh chan hw.LogMsg) hw.TestResult {
+	return m.res
 }
 
 // ============= тесты ===========
@@ -104,7 +117,10 @@ func TestQuit(t *testing.T) {
 }
 
 func TestOneRun(t *testing.T) {
-	m := NewModel(cfg, mockRunner{}, []hw.HWTest{}, "")
+	mockTests := []hw.HWTest{
+		&mockTest{name: "проверка ОЗУ"},
+	}
+	m := NewModel(cfg, mockRunner{}, mockTests, "")
 	assert.Equal(t, startScreen, m.currentScreen)
 
 	button := tea.KeyPressMsg{
