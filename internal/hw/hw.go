@@ -17,9 +17,9 @@ const (
 type LogLevel string
 
 const (
-	INFO = LogLevel("info")
-	WARN = LogLevel("warn")
-	ERR  = LogLevel("err")
+	INFO = LogLevel("INFO")
+	WARN = LogLevel("WARN")
+	ERR  = LogLevel("ERR")
 )
 
 type LogMsg struct {

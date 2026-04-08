@@ -36,4 +36,12 @@ var (
 	
 	spinnerStyle = lipgloss.NewStyle().
 				   Foreground(lipgloss.Color(headerColor))
+
+	infoLevelStyle = lipgloss.NewStyle().
+					 Foreground(lipgloss.Color(passColor))
+	warnLevelStyle = lipgloss.NewStyle().
+					 Foreground(lipgloss.Color(failColor))
+    errLevelStyle = lipgloss.NewStyle().
+					 Foreground(lipgloss.Color(errorColor))
+				
 )

@@ -44,7 +44,7 @@ func multiRow(params []paramCfg, label string, width int, height ...int) string 
 	return borderStyle.Width(width).Height(height[0]).Render(lipgloss.JoinVertical(lipgloss.Left, fields...))
 }
 
-func testsPanel(tests []hw.HWTest, heights ...int) string {
+func testsPanel(tests []hw.HWTest, width int, heights ...int) string {
 	rows := []string{head2Style.Render("ТЕСТЫ К ЗАПУСКУ"),}
 	for _, t := range tests {
 		rows = append(rows, fmt.Sprintf("%s %s", checkMark, t.Name()))
@@ -52,10 +52,11 @@ func testsPanel(tests []hw.HWTest, heights ...int) string {
 	itog := fmt.Sprintf("Итого: %d тестов", len(tests))
 	rows = append(rows, "", itog)
 	left := lipgloss.JoinVertical(lipgloss.Left, rows...)
+	width -= 2 * padding
 	if len(heights) != 1 {
-		return  borderStyle.Width(minLeftColWidth).Render(left)
+		return  borderStyle.Width(width).Render(left)
 	}
-	return  borderStyle.Width(minLeftColWidth).Height(heights[0]).Render(left)
+	return  borderStyle.Width(width).Height(heights[0]).Render(left)
 }
 
 func ramPanel(cfg config.RAM, width int, height ...int) string {
@@ -74,7 +75,6 @@ func romPanel(cfg config.ROM, width int) string {
 		{"Скорость чтения", fmt.Sprintf("%d МБ/с", cfg.MinReadVMBs)},
 		{"Скорость записи", fmt.Sprintf("%d МБ/с", cfg.MinWriteVMBs)},
 	}
-
 	return multiRow(cfgROM, label, width)
 }
 
@@ -86,13 +86,14 @@ func ethPanel(ports []config.Ethernet , width int) string {
 		rows = append(rows, []string{eth.Name, eth.Ip, eth.Port})
 	}
 	innerWidth := width - 2 * border - 2 * padding
+	tableWidth := width - padding
 	t := table.New().
 		Headers(headers...).
 		Rows(rows...).
 		Width(innerWidth).
 		BorderBottom(false).BorderColumn(false).BorderLeft(false).BorderRight(false).BorderTop(false)
 	
-	field := borderStyle.Width(width).Render(
+	field := borderStyle.Width(tableWidth).Render(
 		lipgloss.JoinVertical(lipgloss.Left, label, t.Render()),
 	)
 
@@ -125,7 +126,7 @@ func stressPanel(cfg config.Stress, width int) string {
 		{"Градиент", fmt.Sprintf("%d °C", cfg.Gradient)},
 		{"Длительность", cfg.Duration.String()},
 	}
-
+	width -= padding
 	return multiRow(stress, label, width)
 }
 
@@ -149,7 +150,7 @@ func logsPanel(logs []hw.LogMsg, width int) string {
 
 	logsStr := make([]string, len(logs))
 	for i := range logs {
-		logsStr[i] = fmt.Sprintf("%v %s %s", logs[i].Stamp, logs[i].Level, logs[i].Text)
+		logsStr[i] = fmt.Sprintf("%s %s %s", logs[i].Stamp.Format("15:04:05"), levelWithStyle(logs[i].Level), logs[i].Text)
 	}
 	logsField := lipgloss.JoinVertical(lipgloss.Left, logsStr...)	
 
@@ -157,3 +158,15 @@ func logsPanel(logs []hw.LogMsg, width int) string {
 	return borderStyle.Width(width).Render(lipgloss.JoinVertical(lipgloss.Left, label, logsField))
 }
 
+func levelWithStyle(level hw.LogLevel) string {
+	switch level {
+	case hw.INFO:
+		return infoLevelStyle.Render(string(level))
+	case hw.WARN:
+		return warnLevelStyle.Render(string(level))
+	case hw.ERR:
+		return errLevelStyle.Render(string(level))
+	default:
+		return string(level)
+	}
+}

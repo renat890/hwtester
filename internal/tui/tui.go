@@ -180,21 +180,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() tea.View {
 	s := strings.Builder{}
 
+	leftColWidth := m.width / 3 - 2 * padding
+	if leftColWidth < minLeftColWidth {
+		leftColWidth = minLeftColWidth
+	}
+	rightColWidth :=  m.width - leftColWidth - 2 * padding 
+	if rightColWidth < minRightColWidth {
+		rightColWidth = minRightColWidth
+	}
+
 	switch m.currentScreen {
 	case startScreen:
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s - стартовая конфигурация", m.version))
 
-		rightColWith := m.width / 3 * 2
-		if rightColWith < minRightColWidth {
-			rightColWith = minRightColWidth
-		}
+		
 
-		fieldROM := romPanel(m.cfg.ROM, rightColWith/2)
-		fieldRam := ramPanel(m.cfg.RAM, rightColWith/2, lipgloss.Height(fieldROM))
-		fieldEth := ethPanel(m.cfg.Ports.Ethernets, rightColWith)
-		fieldUSB := usbPanel(m.cfg.USBFlash, rightColWith/2)
-		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWith/2, lipgloss.Height(fieldUSB))
-		fieldStress := stressPanel(m.cfg.Stress, rightColWith)
+		fieldROM := romPanel(m.cfg.ROM, rightColWidth/2)
+		fieldRam := ramPanel(m.cfg.RAM, rightColWidth/2, lipgloss.Height(fieldROM))
+		fieldEth := ethPanel(m.cfg.Ports.Ethernets, rightColWidth)
+		fieldUSB := usbPanel(m.cfg.USBFlash, rightColWidth/2)
+		fieldCOM := comPanel(m.cfg.Ports.COM, rightColWidth/2, lipgloss.Height(fieldUSB))
+		fieldStress := stressPanel(m.cfg.Stress, rightColWidth)
 
 		right := borderStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
 			head2Style.Render("Параметры"),
@@ -205,7 +211,7 @@ func (m Model) View() tea.View {
 		))
 
 		// формирование блока с тестами
-		left := testsPanel(m.tests, lipgloss.Height(right))
+		left := testsPanel(m.tests, leftColWidth, lipgloss.Height(right))
 		// все тело экрана
 		body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 
@@ -221,9 +227,9 @@ func (m Model) View() tea.View {
 		// Блок с текущими тестами
 		// TODO: подумать с шириной левого блока, пока константа
 		
-		left := currentTestsPanel(m.results, m.tests[m.currentTestIdx].Name(), m.spin.View(), minLeftColWidth)
+		left := currentTestsPanel(m.results, m.tests[m.currentTestIdx].Name(), m.spin.View(), leftColWidth)
 		// блок с логам
-		right := logsPanel(m.logs, m.width)
+		right := logsPanel(m.logs, rightColWidth)
 
 		s.WriteString(lipgloss.JoinVertical(
 			lipgloss.Left,
