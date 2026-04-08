@@ -287,7 +287,7 @@ func load(ctx context.Context, worker int, logCh chan string) {
 }
 
 func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat, logCh chan string) {
-	logCh <- fmt.Sprintln("Запущен сборщик показаний температуры")
+	logCh <- fmt.Sprint("Запущен сборщик показаний температуры")
 	attempt := 1
 	getter:
 	for {
@@ -306,7 +306,7 @@ func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.T
 		}
 		time.Sleep(freq)
 	}
-	logCh <- fmt.Sprintln("Остановлен сборщик показаний температуры")
+	logCh <- fmt.Sprint("Остановлен сборщик показаний температуры")
 }
 
 const corePattern = "coretemp"
@@ -408,7 +408,7 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan string) (COMInf
 		if tests {
 			break
 		} else {
-			logCh <- fmt.Sprintln("Неудачная попытка прохождения теста. Перезапускаю тест.")
+			logCh <- fmt.Sprint("Неудачная попытка прохождения теста. Перезапускаю тест.")
 		}
 	}
 
@@ -424,20 +424,20 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan string)
 		BaudRate: 115200,
 	})
 	if err != nil {
-		logCh <- fmt.Sprintln(err)
+		logCh <- fmt.Sprint(err)
 		ch <- false
 		return
 	}
 	defer port.Close()
 
 	if err := port.SetReadTimeout(500 * time.Millisecond); err !=  nil {
-		logCh <- fmt.Sprintln(err)
+		logCh <- fmt.Sprint(err)
 		ch <- false
 		return
 	}
 
 	if err := port.ResetInputBuffer(); err != nil {
-		logCh <- fmt.Sprintln(err)
+		logCh <- fmt.Sprint(err)
 		ch <- false
 		return
 	}
@@ -479,7 +479,7 @@ func portWrite(ctx context.Context, name string, logCh chan string) {
 		BaudRate: 115200,
 	})
 	if err != nil {
-		logCh <- fmt.Sprintln(err)
+		logCh <- fmt.Sprint(err)
 		return
 	}
 	defer port.Close()
@@ -516,20 +516,20 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan string) (USBI
 	for _, diskName := range diskNames {
 		disk, err := diskfs.Open(diskName)
 		if err != nil {
-			logCh <- fmt.Sprintln(err)
+			logCh <- fmt.Sprint(err)
 			continue
 		}
 
 		fs, err := disk.GetFilesystem(1)
 		if err != nil {
-			logCh <- fmt.Sprintln(err)
+			logCh <- fmt.Sprint(err)
 			disk.Close()
 			continue
 		}
 
 		b, err := fs.ReadFile(testFileName)
 		if err != nil {
-			logCh <- fmt.Sprintln("Не удалось прочитать файл")
+			logCh <- fmt.Sprint("Не удалось прочитать файл")
 			disk.Close()
 			continue
 		}
@@ -655,22 +655,22 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			// перед запуском тестов на порту для каждого клиента
 			cmd.Reset()
 			if err = tmpls["preEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name, IP: client.Ip}); err != nil {
-				logCh <- fmt.Sprintln(err)
+				logCh <- fmt.Sprint(err)
 				return 
 			}
 			if err = runCmd(cmd.String()); err != nil {
-				logCh <- fmt.Sprintln(err)
+				logCh <- fmt.Sprint(err)
 				return 
 			}
 			// в конце каждого теста
 			defer func ()  {
 				cmd.Reset()
 				if err = tmpls["postEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name}); err != nil {
-					logCh <- fmt.Sprintln(err)
+					logCh <- fmt.Sprint(err)
 					return  
 				}
 				if err = runCmd(cmd.String()); err != nil {
-					logCh <- fmt.Sprintln(err)
+					logCh <- fmt.Sprint(err)
 				}
 			}()
 
@@ -684,13 +684,13 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			cmd.Reset()
 			// TODO: законфижить путь до бинарника отрпавителя
 			if err = runCmd(fmt.Sprintf("ip netns exec %s ./eth-util --mode=client --ip=%s", nameNetNamespace, server.Ip)); err != nil {
-				logCh <- fmt.Sprintln(err)
+				logCh <- fmt.Sprint(err)
 			}
 
 			actual := <- result
 			if actual != expectedCount {
-				logCh <- fmt.Sprintln("Для пары тест сетевых портов провален")
-				logCh <- fmt.Sprintln("Получено пакетов: ", actual)
+				logCh <- fmt.Sprint("Для пары тест сетевых портов провален")
+				logCh <- fmt.Sprint("Получено пакетов: ", actual)
 				portsInfoRes.PacketsLoss += (expectedCount - actual)
 			}
 			portsInfoRes.Ports = append(portsInfoRes.Ports, server.Name)
@@ -722,13 +722,13 @@ func listen(ctx context.Context, result chan int, ip, port string, logCh chan st
 	address := fmt.Sprintf("%s:%s", ip, port)
 	conn, err := net.ListenPacket("udp", address)
 	if err != nil {
-		logCh <- fmt.Sprintln(err)
+		logCh <- fmt.Sprint(err)
 		result <- 0
 		return
 	}
 	defer conn.Close()
 	if err = conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
-		logCh <- fmt.Sprintln("Не удалось установить дедлайн на чтение")
+		logCh <- fmt.Sprint("Не удалось установить дедлайн на чтение")
 		result <- 0
 		return
 	}
