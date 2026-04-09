@@ -16,8 +16,9 @@ const (
 var (
 	headStyle = lipgloss.NewStyle().
 				Bold(true).
-				Padding(2).
+				Padding(0, padding).
 				Foreground(lipgloss.Color(headerColor))
+				
 
 	head2Style = lipgloss.NewStyle().
 				 Foreground(lipgloss.Color(headerColor))
@@ -28,6 +29,8 @@ var (
 				Foreground(lipgloss.Color(failColor))
 	errorStyle = lipgloss.NewStyle().
 				 Foreground(lipgloss.Color(errorColor))
+	accentStyle = lipgloss.NewStyle().
+				 Foreground(lipgloss.Color(accentColor))
 	
 	borderStyle = lipgloss.NewStyle().
 				  BorderForeground(lipgloss.Color(borderColor)).
@@ -43,5 +46,8 @@ var (
 					 Foreground(lipgloss.Color(failColor))
     errLevelStyle = lipgloss.NewStyle().
 					 Foreground(lipgloss.Color(errorColor))
-				
+	
+	progressStyle = lipgloss.NewStyle().
+					Padding(0, padding)
+								
 )

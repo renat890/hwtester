@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -62,6 +63,8 @@ type Model struct {
 	spin           spinner.Model
 	version        string
 	width          int
+	height int
+	prog progress.Model
 
 	tests []hw.HWTest
 }
@@ -76,6 +79,12 @@ func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest, version
 		spin: spinner.New(
 			spinner.WithSpinner(spinner.Points),
 			spinner.WithStyle(spinnerStyle),
+		),
+		prog: progress.New(
+			progress.WithScaled(true), 
+			progress.WithColors(lipgloss.Green),
+			progress.WithFillCharacters('█', '░'),
+			progress.WithoutPercentage(),
 		),
 		version: version,
 	}
@@ -95,6 +104,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
+		if m.width <= (minLeftColWidth + minRightColWidth) {
+			m.width = minLeftColWidth + minRightColWidth
+		}
+		m.height = msg.Height
+		if m.height <= minColHeight {
+			m.height = minColHeight
+		}
 		return m, nil
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -181,19 +197,11 @@ func (m Model) View() tea.View {
 	s := strings.Builder{}
 
 	leftColWidth := m.width / 3 - 2 * padding
-	if leftColWidth < minLeftColWidth {
-		leftColWidth = minLeftColWidth
-	}
 	rightColWidth :=  m.width - leftColWidth - 2 * padding 
-	if rightColWidth < minRightColWidth {
-		rightColWidth = minRightColWidth
-	}
 
 	switch m.currentScreen {
 	case startScreen:
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s - стартовая конфигурация", m.version))
-
-		
 
 		fieldROM := romPanel(m.cfg.ROM, rightColWidth/2)
 		fieldRam := ramPanel(m.cfg.RAM, rightColWidth/2, lipgloss.Height(fieldROM))
@@ -221,13 +229,16 @@ func (m Model) View() tea.View {
 		s.Reset()
 		// TODO: разобщить титул
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s 00:00:00 68XX s/n 00000", m.version))
-		progressBar := "Прогресс: ==========___________________________ 2/6 ✔ 1 пройден ✘ 1 ошибка ◑ 1 выполняется ○ 3 ожидают"
+		// m.prog.SetWidth(m.width - 2 * padding)
+		// progressBar := m.prog.ViewAs(float64(len(m.results))/float64(len(m.tests)))
+		progressBar := progressPanel(m.prog, m.results, len(m.results), len(m.tests), m.width)
+		// progressBar := "Прогресс: ==========___________________________ 2/6 ✔ 1 пройден ✘ 1 ошибка ◑ 1 выполняется ○ 3 ожидают"
 		s.WriteByte(byte('\n'))
 
 		// Блок с текущими тестами
 		// TODO: подумать с шириной левого блока, пока константа
-		
-		left := currentTestsPanel(m.results, m.tests[m.currentTestIdx].Name(), m.spin.View(), leftColWidth)
+		currentTest := m.tests[m.currentTestIdx].Name()
+		left := currentTestsPanel(m.results, len(m.tests), currentTest, m.spin.View(), leftColWidth)
 		// блок с логам
 		right := logsPanel(m.logs, rightColWidth)
 
