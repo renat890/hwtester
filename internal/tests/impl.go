@@ -38,9 +38,9 @@ type device struct {
 }
 
 type diskSpeed struct {
-	name string
+	name  string
 	write float64
-	read float64
+	read  float64
 }
 
 func bytesToMBytes(bytes uint64) int {
@@ -64,14 +64,14 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 	// const virt = "lsblk -d -b -n -v -o NAME,SIZE -J"
 	logCh <- hw.LogMsg{
 		Level: hw.INFO,
-		Text: "Начаты тесты дисков",
+		Text:  "Начаты тесты дисков",
 		Stamp: time.Now(),
 	}
 	disks := []DiskInfo{}
 
 	// nvme - не все OS поддерживают nvme
 	// virtIO - точно также
-	for _, cmd := range []string{scsi,} {
+	for _, cmd := range []string{scsi} {
 		args := strings.Split(cmd, " ")
 		cmdC := args[0]
 		cmdA := args[1:]
@@ -107,13 +107,13 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 			defer wg.Done()
 			logCh <- hw.LogMsg{
 				Level: hw.INFO,
-				Text: fmt.Sprintf("Измерение скорости диска %s", disk.Name),
+				Text:  fmt.Sprintf("Измерение скорости диска %s", disk.Name),
 				Stamp: time.Now(),
 			}
 			speeds, err := h.checkSpeedDisks(name)
 			if err != nil {
 				chErr <- fmt.Errorf("Ошибка при проверки скорости диска %v", err)
-				return 
+				return
 			}
 			ch <- speeds
 		}(disk.Name)
@@ -123,7 +123,7 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 	close(ch)
 
 	select {
-	case err := <- chErr:
+	case err := <-chErr:
 		return nil, err
 	default:
 	}
@@ -145,7 +145,7 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 
 	logCh <- hw.LogMsg{
 		Level: hw.INFO,
-		Text: "Закончены тесты дисков",
+		Text:  "Закончены тесты дисков",
 		Stamp: time.Now(),
 	}
 
@@ -169,14 +169,14 @@ func (h *HardwareUsage) checkSpeedDisks(name string) (diskSpeed, error) {
 		}
 		n, err := syscall.Read(fd, buf)
 		if err != nil {
-			return diskSpeed{} ,fmt.Errorf("Не удалось проверить запись в сетевой дескриптор для чтения %v", err)
+			return diskSpeed{}, fmt.Errorf("Не удалось проверить запись в сетевой дескриптор для чтения %v", err)
 		}
 		sum += n
 	}
 	end := time.Since(start).Nanoseconds()
 	readSpeed := toMbPerSec(sum, end)
-	
-	wrtName := rdName 
+
+	wrtName := rdName
 	const (
 		nvmeSuf = "p77"
 		scsiSuf = "77"
@@ -200,14 +200,13 @@ func (h *HardwareUsage) checkSpeedDisks(name string) (diskSpeed, error) {
 			}
 			n, err := syscall.Write(fdWrt, buf)
 			if err != nil {
-				return diskSpeed{} ,fmt.Errorf("Не удалось проверить скорость записи в диск %v", err)
+				return diskSpeed{}, fmt.Errorf("Не удалось проверить скорость записи в диск %v", err)
 			}
 			sum += n
 		}
 		end = time.Since(start).Nanoseconds()
 		writeSpeed = toMbPerSec(sum, end)
 	}
-	
 
 	return diskSpeed{write: writeSpeed, read: readSpeed, name: name}, nil
 }
@@ -249,12 +248,12 @@ func (h *HardwareUsage) Load(ctx context.Context, dur time.Duration, logCh chan 
 		}
 		temperatures = append(temperatures, temp)
 	}
-	
+
 	maxT := 0.0
 	if len(temperatures) > 0 {
 		maxT = slices.Max(temperatures)
 	}
-	
+
 	var lastTempCore float64
 	var avgTemp float64
 	lastTemp, err := sensors.SensorsTemperatures()
@@ -271,10 +270,10 @@ func (h *HardwareUsage) Load(ctx context.Context, dur time.Duration, logCh chan 
 
 	return CpuInfo{
 		MaxTempCore: maxT,
-		AvgTemp: avgTemp,
-		EndTemp: lastTempCore,
-		StartTemp: startTmp,
-		Name: getCpuName(),
+		AvgTemp:     avgTemp,
+		EndTemp:     lastTempCore,
+		StartTemp:   startTmp,
+		Name:        getCpuName(),
 	}, nil
 }
 
@@ -289,15 +288,15 @@ func getCpuName() string {
 func load(ctx context.Context, worker int, logCh chan hw.LogMsg) {
 	logCh <- hw.LogMsg{
 		Level: hw.INFO,
-		Text: fmt.Sprintf("Запущен worker с номером - %d", worker),
+		Text:  fmt.Sprintf("Запущен worker с номером - %d", worker),
 		Stamp: time.Now(),
 	}
-		
+
 	var i int64
-	workLoad:
+workLoad:
 	for {
 		select {
-		case <- ctx.Done():
+		case <-ctx.Done():
 			break workLoad
 		default:
 			i++
@@ -308,7 +307,7 @@ func load(ctx context.Context, worker int, logCh chan hw.LogMsg) {
 	}
 	logCh <- hw.LogMsg{
 		Level: hw.INFO,
-		Text: fmt.Sprintf("Остановлен worker с номером - %d", worker),
+		Text:  fmt.Sprintf("Остановлен worker с номером - %d", worker),
 		Stamp: time.Now(),
 	}
 }
@@ -316,14 +315,14 @@ func load(ctx context.Context, worker int, logCh chan hw.LogMsg) {
 func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.TemperatureStat, logCh chan hw.LogMsg) {
 	logCh <- hw.LogMsg{
 		Level: hw.INFO,
-		Text: "Запущен сборщик показаний температуры",
+		Text:  "Запущен сборщик показаний температуры",
 		Stamp: time.Now(),
 	}
 	attempt := 1
-	getter:
+getter:
 	for {
 		select {
-		case <- ctx.Done():
+		case <-ctx.Done():
 			close(ch)
 			break getter
 		default:
@@ -331,19 +330,19 @@ func getTemperature(ctx context.Context, freq time.Duration, ch chan []sensors.T
 			if err != nil {
 				logCh <- hw.LogMsg{
 					Level: hw.WARN,
-					Text: fmt.Sprintf("ошибка опроса датчика температуры, попытка №%d", attempt),
+					Text:  fmt.Sprintf("ошибка опроса датчика температуры, попытка №%d", attempt),
 					Stamp: time.Now(),
 				}
 				attempt++
 				continue
-			} 
-			ch <- info 
+			}
+			ch <- info
 		}
 		time.Sleep(freq)
 	}
 	logCh <- hw.LogMsg{
 		Level: hw.INFO,
-		Text: "Остановлен сборщик показаний температуры",
+		Text:  "Остановлен сборщик показаний температуры",
 		Stamp: time.Now(),
 	}
 }
@@ -404,7 +403,7 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan hw.LogMsg) (COM
 	for _, port := range ports {
 		logCh <- hw.LogMsg{
 			Level: hw.INFO,
-			Text: fmt.Sprintf("Найден порт: %v", port),
+			Text:  fmt.Sprintf("Найден порт: %v", port),
 			Stamp: time.Now(),
 		}
 	}
@@ -426,33 +425,33 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan hw.LogMsg) (COM
 
 	for i := range testsAttempt {
 		tests = true
-		ctx, cancel := context.WithTimeout(ctx, 2 * time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 
 		logCh <- hw.LogMsg{
 			Level: hw.INFO,
-			Text: fmt.Sprintf("%d попытка прохождения теста с COM-портами", i+1),
+			Text:  fmt.Sprintf("%d попытка прохождения теста с COM-портами", i+1),
 			Stamp: time.Now(),
 		}
 
 		for rPort, wPort := range pairs {
 			logCh <- hw.LogMsg{
 				Level: hw.INFO,
-				Text: fmt.Sprintf("Тестирование пары rPort %s, wPort %s", rPort, wPort),
+				Text:  fmt.Sprintf("Тестирование пары rPort %s, wPort %s", rPort, wPort),
 				Stamp: time.Now(),
 			}
 
 			wg.Add(2)
-			go func(r string)  {
+			go func(r string) {
 				defer wg.Done()
 				portRead(ctx, r, result, logCh)
 			}(rPort)
 			go func(w string) {
 				defer wg.Done()
 				portWrite(ctx, w, logCh)
-			}(wPort) 
+			}(wPort)
 			wg.Wait()
 
-			res, ok := <- result
+			res, ok := <-result
 			if !ok || !res {
 				tests = false
 			}
@@ -463,7 +462,7 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan hw.LogMsg) (COM
 		} else {
 			logCh <- hw.LogMsg{
 				Level: hw.WARN,
-				Text: "Неудачная попытка прохождения теста. Перезапускаю тест.",
+				Text:  "Неудачная попытка прохождения теста. Перезапускаю тест.",
 				Stamp: time.Now(),
 			}
 		}
@@ -472,7 +471,7 @@ func (h *HardwareUsage) EchoTest(ctx context.Context, logCh chan hw.LogMsg) (COM
 	final := COMInfo{Result: false, TestPorts: ports}
 	if tests {
 		final.Result = true
-	} 
+	}
 	return final, nil
 }
 
@@ -483,7 +482,7 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan hw.LogM
 	if err != nil {
 		logCh <- hw.LogMsg{
 			Level: hw.ERR,
-			Text: err.Error(),
+			Text:  err.Error(),
 			Stamp: time.Now(),
 		}
 		ch <- false
@@ -491,10 +490,10 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan hw.LogM
 	}
 	defer port.Close()
 
-	if err := port.SetReadTimeout(500 * time.Millisecond); err !=  nil {
+	if err := port.SetReadTimeout(500 * time.Millisecond); err != nil {
 		logCh <- hw.LogMsg{
 			Level: hw.ERR,
-			Text: err.Error(),
+			Text:  err.Error(),
 			Stamp: time.Now(),
 		}
 		ch <- false
@@ -504,7 +503,7 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan hw.LogM
 	if err := port.ResetInputBuffer(); err != nil {
 		logCh <- hw.LogMsg{
 			Level: hw.ERR,
-			Text: err.Error(),
+			Text:  err.Error(),
 			Stamp: time.Now(),
 		}
 		ch <- false
@@ -513,16 +512,16 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan hw.LogM
 
 	var final strings.Builder
 	buf := make([]byte, 8)
-	numMsg := 1 
+	numMsg := 1
 	logCh <- hw.LogMsg{
 		Level: hw.INFO,
-		Text: fmt.Sprintf("Запущен порт читатель rPort %s", name),
+		Text:  fmt.Sprintf("Запущен порт читатель rPort %s", name),
 		Stamp: time.Now(),
 	}
-	reader:
+reader:
 	for {
 		select {
-		case <- ctx.Done():
+		case <-ctx.Done():
 			ch <- false
 			return
 		default:
@@ -530,7 +529,7 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan hw.LogM
 			if err != nil {
 				logCh <- hw.LogMsg{
 					Level: hw.WARN,
-					Text: fmt.Sprintf("Ошибка чтения из COM-порта: %s", err.Error()),
+					Text:  fmt.Sprintf("Ошибка чтения из COM-порта: %s", err.Error()),
 					Stamp: time.Now(),
 				}
 			}
@@ -545,7 +544,7 @@ func portRead(ctx context.Context, name string, ch chan bool, logCh chan hw.LogM
 		}
 	}
 	if msg == final.String() {
-		ch <- true	
+		ch <- true
 	} else {
 		ch <- false
 	}
@@ -558,7 +557,7 @@ func portWrite(ctx context.Context, name string, logCh chan hw.LogMsg) {
 	if err != nil {
 		logCh <- hw.LogMsg{
 			Level: hw.ERR,
-			Text: err.Error(),
+			Text:  err.Error(),
 			Stamp: time.Now(),
 		}
 		return
@@ -566,7 +565,7 @@ func portWrite(ctx context.Context, name string, logCh chan hw.LogMsg) {
 	defer port.Close()
 	logCh <- hw.LogMsg{
 		Level: hw.INFO,
-		Text: fmt.Sprintf("Запущен порт писатель wPort %s", name),
+		Text:  fmt.Sprintf("Запущен порт писатель wPort %s", name),
 		Stamp: time.Now(),
 	}
 	if ctx.Err() != nil {
@@ -576,7 +575,7 @@ func portWrite(ctx context.Context, name string, logCh chan hw.LogMsg) {
 	if err != nil {
 		logCh <- hw.LogMsg{
 			Level: hw.WARN,
-			Text: fmt.Sprintf("Ошибка записи в COM-порт: %s", err.Error()),
+			Text:  fmt.Sprintf("Ошибка записи в COM-порт: %s", err.Error()),
 			Stamp: time.Now(),
 		}
 	}
@@ -593,7 +592,7 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (U
 	}
 	diskNames := make([]string, 0)
 	for _, val := range disks {
-		isValidSize := math.Abs(float64(sizeInMB - val.VolumeMB)) < float64(sizeInMB / 100 * 2)
+		isValidSize := math.Abs(float64(sizeInMB-val.VolumeMB)) < float64(sizeInMB/100*2)
 		if isValidSize {
 			name := "/dev/" + strings.TrimSpace(val.Name)
 			diskNames = append(diskNames, name)
@@ -606,20 +605,20 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (U
 		disk, err := diskfs.Open(diskName)
 		if err != nil {
 			logCh <- hw.LogMsg{
-			Level: hw.ERR,
-			Text: err.Error(),
-			Stamp: time.Now(),
-		}
+				Level: hw.ERR,
+				Text:  err.Error(),
+				Stamp: time.Now(),
+			}
 			continue
 		}
 
 		fs, err := disk.GetFilesystem(1)
 		if err != nil {
 			logCh <- hw.LogMsg{
-			Level: hw.ERR,
-			Text: err.Error(),
-			Stamp: time.Now(),
-		}
+				Level: hw.ERR,
+				Text:  err.Error(),
+				Stamp: time.Now(),
+			}
 			disk.Close()
 			continue
 		}
@@ -628,7 +627,7 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (U
 		if err != nil {
 			logCh <- hw.LogMsg{
 				Level: hw.ERR,
-				Text: "Не удалось прочитать файл",
+				Text:  "Не удалось прочитать файл",
 				Stamp: time.Now(),
 			}
 			disk.Close()
@@ -637,7 +636,7 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (U
 		// TODO: вынести в конфигурационный файл ожидаемое содержимое
 		const expectedString = "is opened testing file"
 		// убираем спецсимвол в конце строки
-		a,_,_ := strings.Cut(string(b), "\n")
+		a, _, _ := strings.Cut(string(b), "\n")
 		if a == expectedString {
 			actual++
 		}
@@ -645,7 +644,7 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (U
 		if err = disk.Close(); err != nil {
 			logCh <- hw.LogMsg{
 				Level: hw.ERR,
-				Text: fmt.Sprintf("ошибка закрытия флешки: %s", err.Error()),
+				Text:  fmt.Sprintf("ошибка закрытия флешки: %s", err.Error()),
 				Stamp: time.Now(),
 			}
 		}
@@ -659,7 +658,7 @@ func (h *HardwareUsage) GetUSBInfo(ctx context.Context, logCh chan hw.LogMsg) (U
 }
 
 func scsiDevices() ([]DiskInfo, error) {
-	
+
 	cmd := exec.Command("lsblk", strings.Split("-d -b -n -S -o NAME,SIZE -J", " ")...)
 	out, err := cmd.Output()
 	if err != nil {
@@ -690,9 +689,9 @@ const nameNetNamespace = "testns"
 func loadTemplates() (map[string]*template.Template, error) {
 	result := map[string]*template.Template{}
 	patterns := map[string]string{
-		"preTest": "ip netns add {{.NS}}",
-		"postTest": "ip netns delete {{.NS}}",
-		"preEachEth": `sh -c "ip link set {{.Eth}} netns {{.NS}} && ip netns exec {{.NS}} ip addr add {{.IP}}/24 dev {{.Eth}} && ip netns exec {{.NS}} ip link set {{.Eth}} up"`,
+		"preTest":     "ip netns add {{.NS}}",
+		"postTest":    "ip netns delete {{.NS}}",
+		"preEachEth":  `sh -c "ip link set {{.Eth}} netns {{.NS}} && ip netns exec {{.NS}} ip addr add {{.IP}}/24 dev {{.Eth}} && ip netns exec {{.NS}} ip link set {{.Eth}} up"`,
 		"postEachEth": "ip netns exec {{.NS}} ip link set {{.Eth}} netns 1",
 	}
 
@@ -701,7 +700,7 @@ func loadTemplates() (map[string]*template.Template, error) {
 		if err != nil {
 			return nil, err
 		}
-		result[name] = tmpl 
+		result[name] = tmpl
 	}
 
 	return result, nil
@@ -714,11 +713,11 @@ func splitCmd(cmd string) (string, []string) {
 
 func runCmd(cmd string) error {
 	cmdC, cmdA := splitCmd(cmd)
-	_, err := exec.Command(cmdC, cmdA...).Output() 
+	_, err := exec.Command(cmdC, cmdA...).Output()
 	if err != nil {
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
-	return err
+			return err
 		}
 		return fmt.Errorf("ошибка выполнения команды %v", string(exErr.Stderr))
 	}
@@ -733,19 +732,19 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 		return PortsInfo{}, err
 	}
 	type args struct {
-		NS string
-		IP string
+		NS  string
+		IP  string
 		Eth string
 	}
 	var cmd bytes.Buffer
-	
+
 	// выполняю действия перед тестами сетевых интерфейсов
 	err = tmpls["preTest"].Execute(&cmd, args{NS: nameNetNamespace})
 	if err != nil {
-		return PortsInfo{}, err
+		return PortsInfo{}, fmt.Errorf("ошибка создания шаблона пре-теста %v", err)
 	}
 	if err = runCmd(cmd.String()); err != nil {
-		return PortsInfo{}, err
+		return PortsInfo{}, fmt.Errorf("ошибка выполнения пре-теста %v %s", err, cmd.String())
 	}
 
 	// создание пар портов
@@ -761,48 +760,48 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 
 	// их перебор
 	result := make(chan int)
-	
+
 	for client, server := range pairs {
-		func ()  {
+		func() {
 			// перед запуском тестов на порту для каждого клиента
 			cmd.Reset()
 			if err = tmpls["preEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name, IP: client.Ip}); err != nil {
 				logCh <- hw.LogMsg{
-			Level: hw.ERR,
-			Text: err.Error(),
-			Stamp: time.Now(),
-		}
-				return 
+					Level: hw.ERR,
+					Text:  err.Error(),
+					Stamp: time.Now(),
+				}
+				return
 			}
 			if err = runCmd(cmd.String()); err != nil {
 				logCh <- hw.LogMsg{
-			Level: hw.ERR,
-			Text: err.Error(),
-			Stamp: time.Now(),
-		}
-				return 
+					Level: hw.ERR,
+					Text:  err.Error(),
+					Stamp: time.Now(),
+				}
+				return
 			}
 			// в конце каждого теста
-			defer func ()  {
+			defer func() {
 				cmd.Reset()
 				if err = tmpls["postEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name}); err != nil {
 					logCh <- hw.LogMsg{
-			Level: hw.ERR,
-			Text: err.Error(),
-			Stamp: time.Now(),
-		}
-					return  
+						Level: hw.ERR,
+						Text:  err.Error(),
+						Stamp: time.Now(),
+					}
+					return
 				}
 				if err = runCmd(cmd.String()); err != nil {
 					logCh <- hw.LogMsg{
-			Level: hw.ERR,
-			Text: err.Error(),
-			Stamp: time.Now(),
-		}
+						Level: hw.ERR,
+						Text:  err.Error(),
+						Stamp: time.Now(),
+					}
 				}
 			}()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 30 * time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
 			// сам тест портов
@@ -813,17 +812,17 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			// TODO: законфижить путь до бинарника отрпавителя
 			if err = runCmd(fmt.Sprintf("ip netns exec %s ./eth-util --mode=client --ip=%s", nameNetNamespace, server.Ip)); err != nil {
 				logCh <- hw.LogMsg{
-			Level: hw.ERR,
-			Text: err.Error(),
-			Stamp: time.Now(),
-		}
+					Level: hw.ERR,
+					Text:  err.Error(),
+					Stamp: time.Now(),
+				}
 			}
 
-			actual := <- result
+			actual := <-result
 			if actual != expectedCount {
 				logCh <- hw.LogMsg{
 					Level: hw.ERR,
-					Text: fmt.Sprintf("Для пары тест сетевых портов провален. Получено пакетов: %d", actual),
+					Text:  fmt.Sprintf("Для пары тест сетевых портов провален. Получено пакетов: %d", actual),
 				}
 				portsInfoRes.PacketsLoss += (expectedCount - actual)
 			}
@@ -835,17 +834,17 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 	cmd.Reset()
 	err = tmpls["postTest"].Execute(&cmd, args{NS: nameNetNamespace})
 	if err != nil {
-		return PortsInfo{}, err
+		return PortsInfo{}, fmt.Errorf("ошибка создания шаблона пост-тестовых действий %v", err)
 	}
 	if err = runCmd(cmd.String()); err != nil {
-		return PortsInfo{}, err
+		return PortsInfo{}, fmt.Errorf("ошибка выполнения пост-тестовых действий %v", err)
 	}
 
 	return portsInfoRes, nil
 }
 
 const (
-	expectedMsg = "expected message"
+	expectedMsg   = "expected message"
 	expectedCount = 1_000
 )
 
@@ -855,7 +854,7 @@ func listen(ctx context.Context, result chan int, ip, port string, logCh chan hw
 	if err != nil {
 		logCh <- hw.LogMsg{
 			Level: hw.ERR,
-			Text: err.Error(),
+			Text:  err.Error(),
 			Stamp: time.Now(),
 		}
 		result <- 0
@@ -865,7 +864,7 @@ func listen(ctx context.Context, result chan int, ip, port string, logCh chan hw
 	if err = conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		logCh <- hw.LogMsg{
 			Level: hw.ERR,
-			Text: "Не удалось установить дедлайн на чтение",
+			Text:  "Не удалось установить дедлайн на чтение",
 			Stamp: time.Now(),
 		}
 		result <- 0
@@ -874,8 +873,8 @@ func listen(ctx context.Context, result chan int, ip, port string, logCh chan hw
 
 	count := 0
 
-	go func ()  {
-		<- ctx.Done()
+	go func() {
+		<-ctx.Done()
 		conn.Close()
 	}()
 
@@ -883,7 +882,7 @@ func listen(ctx context.Context, result chan int, ip, port string, logCh chan hw
 		packet := make([]byte, 1024)
 		n, _, err := conn.ReadFrom(packet)
 		if err != nil {
-			break 
+			break
 		}
 		if string(packet[:n]) == expectedMsg {
 			count++
@@ -891,7 +890,7 @@ func listen(ctx context.Context, result chan int, ip, port string, logCh chan hw
 		if count == expectedCount {
 			break
 		}
-}
+	}
 
 	result <- count
 }
