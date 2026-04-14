@@ -178,7 +178,7 @@ func progressPanel(p progress.Model, res []hw.TestResult, cur, all, width int) s
 	return field
 }
 
-func currentTestsPanel(res []hw.TestResult, all int, current, spinner string, width int) string {
+func currentTestsPanel(res []hw.TestResult, all int, current, spinner string, width int, height ...int) string {
 	label := head2Style.Render("ХОД ТЕСТИРОВАНИЯ 68ХХ:")
 	
 	tests := make([]string, len(res), len(res) + 1)
@@ -193,7 +193,12 @@ func currentTestsPanel(res []hw.TestResult, all int, current, spinner string, wi
 	
 	renderTests := lipgloss.JoinVertical(lipgloss.Left, tests...)
 
-	return borderStyle.Width(width).Render(
+	if len(height) != 1 {
+		return borderStyle.Width(width).Render(
+			lipgloss.JoinVertical(lipgloss.Left, label, renderTests),
+		)
+	}
+	return borderStyle.Width(width).Height(height[0]).Render(
 		lipgloss.JoinVertical(lipgloss.Left, label, renderTests),
 	)
 }
@@ -211,15 +216,78 @@ func logsPanel(logs []hw.LogMsg, width int) string {
 	return borderStyle.Width(width).Render(lipgloss.JoinVertical(lipgloss.Left, label, logsField))
 }
 
-func levelWithStyle(level hw.LogLevel) string {
-	switch level {
-	case hw.INFO:
-		return infoLevelStyle.Render(string(level))
-	case hw.WARN:
-		return warnLevelStyle.Render(string(level))
-	case hw.ERR:
-		return errLevelStyle.Render(string(level))
-	default:
-		return string(level)
+// Панели для resultScreen
+
+func generalResultPanel(final hw.Status, res []hw.TestResult, width int) string {
+	label := head2Style.Render("Общий результат")
+	resCount := map[hw.Status]int{
+		hw.Error: 0,
+		hw.Pass: 0,
+		hw.Fail: 0,
+		hw.Skip: 0,
 	}
+	for _, val := range res {
+		switch val.Status {
+		case hw.Error:
+			resCount[hw.Error]++
+		case hw.Pass:
+			resCount[hw.Pass]++
+		case hw.Fail:
+			resCount[hw.Fail]++
+		case hw.Skip:
+			resCount[hw.Skip]++
+		}
+	}
+
+	statuses := []hw.Status{hw.Pass, hw.Fail, hw.Error, hw.Skip}
+	fieldsStat := []string{}
+	for _, s := range statuses {
+		fieldsStat = append(
+			fieldsStat,
+			lipgloss.JoinVertical(
+				lipgloss.Center, 
+				textWithStyle(strconv.Itoa(resCount[s]), s), 
+				statusWithStyle(s),
+			),
+		)
+	}
+
+	stat := lipgloss.JoinHorizontal(lipgloss.Center, fieldsStat...)
+
+	icon := "✘"
+	humanFinal := "ТЕСТИРОВАНИЕ НЕ ПРОЙДЕНО"
+	if final == hw.Pass {
+		icon = "✔"
+		humanFinal = "ТЕСТИРОВАНИЕ ПРОЙДЕНО"
+	}
+
+	return lipgloss.NewStyle().Padding(0, padding).Border(lipgloss.NormalBorder()).Width(width).Render(
+		lipgloss.JoinHorizontal(
+			lipgloss.Center,
+			icon,
+			lipgloss.JoinVertical(lipgloss.Left, label, humanFinal),
+			stat,
+		),
+	)
+}
+
+func resultsPanel(items []hw.TestResult, width int) string {
+	tHeaders := []string{"Имя", "Статус", "Детали", "Метрики"}
+	tRows := [][]string{}
+
+	for _, row := range items {
+		var metrs strings.Builder
+		for key, val := range row.Metrics {
+			metrs.WriteString(fmt.Sprintf("%s: %v\n", key, val))
+		}
+		styledStatus := statusWithStyle(row.Status)
+		tRows = append(tRows, []string{row.Name, styledStatus, row.Details, metrs.String()})
+	}
+
+	t := table.New().
+		Headers(tHeaders...).
+		Rows(tRows...)
+
+	out := fmt.Sprintf("%s\n", t.Render())
+	return out
 }

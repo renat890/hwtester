@@ -14,7 +14,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"charm.land/lipgloss/v2/table"
 )
 
 //go:embed template/*.txt
@@ -229,19 +228,17 @@ func (m Model) View() tea.View {
 		s.Reset()
 		// TODO: разобщить титул
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s 00:00:00 68XX s/n 00000", m.version))
-		// m.prog.SetWidth(m.width - 2 * padding)
-		// progressBar := m.prog.ViewAs(float64(len(m.results))/float64(len(m.tests)))
+
 		progressBar := progressPanel(m.prog, m.results, len(m.results), len(m.tests), m.width)
-		// progressBar := "Прогресс: ==========___________________________ 2/6 ✔ 1 пройден ✘ 1 ошибка ◑ 1 выполняется ○ 3 ожидают"
 		s.WriteByte(byte('\n'))
 
+		// блок с логам
+		right := logsPanel(m.logs, rightColWidth)
 		// Блок с текущими тестами
 		// TODO: подумать с шириной левого блока, пока константа
 		currentTest := m.tests[m.currentTestIdx].Name()
-		left := currentTestsPanel(m.results, len(m.tests), currentTest, m.spin.View(), leftColWidth)
-		// блок с логам
-		right := logsPanel(m.logs, rightColWidth)
-
+		left := currentTestsPanel(m.results, len(m.tests), currentTest, m.spin.View(), leftColWidth, lipgloss.Height(right))
+		
 		s.WriteString(lipgloss.JoinVertical(
 			lipgloss.Left,
 			title,
@@ -250,12 +247,15 @@ func (m Model) View() tea.View {
 		) 
 	case resultScreen:
 		s.Reset()
-		s.WriteString(headStyle.Render("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ"))
+		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s 68XX · s/n 00000 Завершено: 01-01-1970 00:00:00 Длительность: 00:00", m.version))
 		s.WriteByte(byte('\n'))
 
-		s.WriteString("Результаты тестирования:\n")
-		s.WriteString(genResultString(m.results))
-		s.WriteString(fmt.Sprintf("Общий результат: %s\n", statusWithStyle(m.final)))
+		s.WriteString(lipgloss.JoinVertical(lipgloss.Left,
+			title,
+			generalResultPanel(m.final, m.results, m.width),
+			resultsPanel(m.results, m.width),
+			fmt.Sprintf("Общий результат: %s\n", statusWithStyle(m.final)),
+		))
 	}
 
 	v := tea.NewView(s.String())
@@ -266,39 +266,7 @@ func (m Model) View() tea.View {
 	return v
 }
 
-func statusWithStyle(status hw.Status) string {
-	var newStatus string
-	switch status {
-	case hw.Pass:
-		newStatus = passStyle.Render(string(hw.Pass))
-	case hw.Error:
-		newStatus = errorStyle.Render(string(hw.Error))
-	case hw.Fail:
-		newStatus = failStyle.Render(string(hw.Fail))
-	}
-	return newStatus
-}
 
-func genResultString(items []hw.TestResult) string {
-	tHeaders := []string{"Имя", "Статус", "Детали", "Метрики"}
-	tRows := [][]string{}
-
-	for _, row := range items {
-		var metrs strings.Builder
-		for key, val := range row.Metrics {
-			metrs.WriteString(fmt.Sprintf("%s: %v\n", key, val))
-		}
-		styledStatus := statusWithStyle(row.Status)
-		tRows = append(tRows, []string{row.Name, styledStatus, row.Details, metrs.String()})
-	}
-
-	t := table.New().
-		Headers(tHeaders...).
-		Rows(tRows...)
-
-	out := fmt.Sprintf("%s\n", t.Render())
-	return out
-}
 
 func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {
 	return func() tea.Msg {
