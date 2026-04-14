@@ -715,7 +715,14 @@ func splitCmd(cmd string) (string, []string) {
 func runCmd(cmd string) error {
 	cmdC, cmdA := splitCmd(cmd)
 	_, err := exec.Command(cmdC, cmdA...).Output() 
+	if err != nil {
+		exErr, ok := err.(*exec.ExitError)
+		if !ok {
 	return err
+		}
+		return fmt.Errorf("ошибка выполнения команды %v", string(exErr.Stderr))
+	}
+	return nil
 }
 
 func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethernet, logCh chan hw.LogMsg) (PortsInfo, error) {
