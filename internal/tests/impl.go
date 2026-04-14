@@ -79,13 +79,13 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 		cmd := exec.Command(cmdC, cmdA...)
 		out, err := cmd.Output()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Не удалось выполнить команду для получения дисков %v", err)
 		}
 
 		var o output
 		err = json.Unmarshal(out, &o)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Не удалось преобразовать данные в структуры дисков %v", err)
 		}
 
 		for _, info := range o.BlockDevices {
@@ -105,9 +105,14 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 	for _, disk := range disks {
 		go func(name string) {
 			defer wg.Done()
+			logCh <- hw.LogMsg{
+				Level: hw.INFO,
+				Text: fmt.Sprintf("Измерение скорости диска %s", disk.Name),
+				Stamp: time.Now(),
+			}
 			speeds, err := h.checkSpeedDisks(name)
 			if err != nil {
-				chErr <- err
+				chErr <- fmt.Errorf("Ошибка при проверки скорости диска %v", err)
 				return 
 			}
 			ch <- speeds
@@ -138,14 +143,20 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 		}
 	}
 
+	logCh <- hw.LogMsg{
+		Level: hw.INFO,
+		Text: "Закончены тесты дисков",
+		Stamp: time.Now(),
+	}
+
 	return disks, nil
 }
 
 func (h *HardwareUsage) checkSpeedDisks(name string) (diskSpeed, error) {
 	rdName := "/dev/" + name
-	fd, err := syscall.Open(rdName, syscall.O_RDONLY|syscall.O_DIRECT, 0)
+	fd, err := syscall.Open(rdName, syscall.O_RDONLY|syscall.O_SYNC, 0)
 	if err != nil {
-		return diskSpeed{}, err
+		return diskSpeed{}, fmt.Errorf("Не удалось открыть дескриптор диска для чтения %v", err)
 	}
 	defer syscall.Close(fd)
 	buf := make([]byte, 32*1024)
@@ -158,7 +169,7 @@ func (h *HardwareUsage) checkSpeedDisks(name string) (diskSpeed, error) {
 		}
 		n, err := syscall.Read(fd, buf)
 		if err != nil {
-			return diskSpeed{} ,err
+			return diskSpeed{} ,fmt.Errorf("Не удалось проверить запись в сетевой дескриптор для чтения %v", err)
 		}
 		sum += n
 	}
@@ -189,7 +200,7 @@ func (h *HardwareUsage) checkSpeedDisks(name string) (diskSpeed, error) {
 			}
 			n, err := syscall.Write(fdWrt, buf)
 			if err != nil {
-				return diskSpeed{} ,err
+				return diskSpeed{} ,fmt.Errorf("Не удалось проверить скорость записи в диск %v", err)
 			}
 			sum += n
 		}

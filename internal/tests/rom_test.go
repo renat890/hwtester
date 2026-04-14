@@ -17,7 +17,7 @@ type mockRom struct {
 	err   error
 }
 
-func (m *mockRom) Info() ([]DiskInfo, error) {
+func (m *mockRom) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 	return m.disks, m.err
 }
 
