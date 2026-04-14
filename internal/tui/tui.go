@@ -253,8 +253,7 @@ func (m Model) View() tea.View {
 		s.WriteString(lipgloss.JoinVertical(lipgloss.Left,
 			title,
 			generalResultPanel(m.final, m.results, m.width),
-			resultsPanel(m.results, m.width),
-			fmt.Sprintf("Общий результат: %s\n", statusWithStyle(m.final)),
+			resultsPanel(m.results, m.final, m.width),
 		))
 	}
 
@@ -265,7 +264,6 @@ func (m Model) View() tea.View {
 
 	return v
 }
-
 
 
 func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {

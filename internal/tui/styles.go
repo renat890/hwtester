@@ -36,6 +36,10 @@ var (
 				  BorderForeground(lipgloss.Color(borderColor)).
 				  BorderStyle(lipgloss.NormalBorder()).
 				  Padding(0, 1)
+
+	tableStyle =  lipgloss.NewStyle().
+				  Foreground(lipgloss.Color(borderColor))
+
 	
 	spinnerStyle = lipgloss.NewStyle().
 				   Foreground(lipgloss.Color(headerColor))

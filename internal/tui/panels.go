@@ -249,29 +249,37 @@ func generalResultPanel(final hw.Status, res []hw.TestResult, width int) string 
 				textWithStyle(strconv.Itoa(resCount[s]), s), 
 				statusWithStyle(s),
 			),
+			" ",
 		)
 	}
 
 	stat := lipgloss.JoinHorizontal(lipgloss.Center, fieldsStat...)
 
-	icon := "✘"
-	humanFinal := "ТЕСТИРОВАНИЕ НЕ ПРОЙДЕНО"
+	icon := failStyle.Render("✘")
+	humanFinal := failStyle.Render("ТЕСТИРОВАНИЕ НЕ ПРОЙДЕНО")
 	if final == hw.Pass {
-		icon = "✔"
-		humanFinal = "ТЕСТИРОВАНИЕ ПРОЙДЕНО"
+		icon = passStyle.Render("✔")
+		humanFinal = passStyle.Render("ТЕСТИРОВАНИЕ ПРОЙДЕНО")
 	}
 
-	return lipgloss.NewStyle().Padding(0, padding).Border(lipgloss.NormalBorder()).Width(width).Render(
+	resWidth := width / 3 * 2
+
+	return borderStyle.Padding(0, padding).Width(width).Render(
 		lipgloss.JoinHorizontal(
 			lipgloss.Center,
 			icon,
+			" ",
 			lipgloss.JoinVertical(lipgloss.Left, label, humanFinal),
+			strings.Repeat(" ", resWidth),
 			stat,
 		),
 	)
 }
 
-func resultsPanel(items []hw.TestResult, width int) string {
+func resultsPanel(items []hw.TestResult, final hw.Status, width int) string {
+	label := head2Style.Render("РЕЗУЛЬТАТЫ ПО ТЕСТАМ")
+	footer := "q - Выход"
+	
 	tHeaders := []string{"Имя", "Статус", "Детали", "Метрики"}
 	tRows := [][]string{}
 
@@ -284,10 +292,12 @@ func resultsPanel(items []hw.TestResult, width int) string {
 		tRows = append(tRows, []string{row.Name, styledStatus, row.Details, metrs.String()})
 	}
 
-	t := table.New().
-		Headers(tHeaders...).
-		Rows(tRows...)
+	tWidth := width - 2 * padding - 2 * border
 
-	out := fmt.Sprintf("%s\n", t.Render())
+	t := table.New().Width(tWidth).BorderStyle(tableStyle).Headers(tHeaders...).Rows(tRows...)
+
+	finalRes := fmt.Sprintf("Общий результат: %s\n", statusWithStyle(final))
+
+	out :=  borderStyle.Width(width).Render(lipgloss.JoinVertical(lipgloss.Left, label, t.Render(), finalRes, footer))
 	return out
 }
