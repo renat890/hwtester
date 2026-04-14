@@ -58,14 +58,20 @@ func (h *HardwareUsage) GetMemory() (int, error) {
 
 }
 
-func (h *HardwareUsage) Info() ([]DiskInfo, error) {
-	const nvme = "lsblk -d -b -n -N -o NAME,SIZE -J"
+func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
+	// const nvme = "lsblk -d -b -n -N -o NAME,SIZE -J"
 	const scsi = "lsblk -d -b -n -S -o NAME,SIZE -J"
-	const virt = "lsblk -d -b -n -v -o NAME,SIZE -J"
-
+	// const virt = "lsblk -d -b -n -v -o NAME,SIZE -J"
+	logCh <- hw.LogMsg{
+		Level: hw.INFO,
+		Text: "Начаты тесты дисков",
+		Stamp: time.Now(),
+	}
 	disks := []DiskInfo{}
 
-	for _, cmd := range []string{nvme, scsi, virt} {
+	// nvme - не все OS поддерживают nvme
+	// virtIO - точно также
+	for _, cmd := range []string{scsi,} {
 		args := strings.Split(cmd, " ")
 		cmdC := args[0]
 		cmdA := args[1:]
