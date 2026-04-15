@@ -747,6 +747,18 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 		return PortsInfo{}, fmt.Errorf("ошибка выполнения пре-теста %v %s", err, cmd.String())
 	}
 
+	defer func ()  {
+		// выполняю действия после тестов сетевых интерфейсов
+		var lastCmd strings.Builder
+		err = tmpls["postTest"].Execute(&lastCmd, args{NS: nameNetNamespace})
+		if err != nil {
+			return // PortsInfo{}, fmt.Errorf("ошибка создания шаблона пост-тестовых действий %v", err)
+		}
+		if err = runCmd(lastCmd.String()); err != nil {
+			return // PortsInfo{}, fmt.Errorf("ошибка выполнения пост-тестовых действий %v", err)
+		}
+	}()
+
 	// создание пар портов
 	if len(eths) != 4 {
 		return PortsInfo{}, errors.New("количество портов не равно 4")
