@@ -118,6 +118,9 @@ func (e *EthernetsTest) Run(ctx context.Context, logCh chan hw.LogMsg) (result h
 		reqPorts[i] = e.conf.Ethernets[i].Name
 	}
 
+	result.Metrics = map[string]any{}
+	result.Metrics["Eth-порты"] = ethernetsInfo.Ports
+
 	for _, port := range reqPorts {
 		if !slices.Contains(ethernetsInfo.Ports, port) {
 			result.Status = hw.Fail
