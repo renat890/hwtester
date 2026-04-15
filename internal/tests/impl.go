@@ -828,6 +828,8 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 					Text:  err.Error(),
 					Stamp: time.Now(),
 				}
+				errList = append(errList,fmt.Errorf("не удалось запустить клиента для порта %s", client.Name))
+				return 
 			}
 
 			actual := <-result
@@ -842,14 +844,13 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 		}()
 	}
 
-	// выполняю действия после тестов сетевых интерфейсов
-	cmd.Reset()
-	err = tmpls["postTest"].Execute(&cmd, args{NS: nameNetNamespace})
-	if err != nil {
-		return PortsInfo{}, fmt.Errorf("ошибка создания шаблона пост-тестовых действий %v", err)
-	}
-	if err = runCmd(cmd.String()); err != nil {
-		return PortsInfo{}, fmt.Errorf("ошибка выполнения пост-тестовых действий %v", err)
+	if len(errList) != 0 {
+		var longErrStr strings.Builder
+		for _, e := range errList {
+			longErrStr.WriteString(e.Error())
+			longErrStr.WriteRune('\n')
+		}
+		return portsInfoRes, errors.New(longErrStr.String())
 	}
 
 	return portsInfoRes, nil
