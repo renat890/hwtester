@@ -691,8 +691,10 @@ func loadTemplates() (map[string]*template.Template, error) {
 	patterns := map[string]string{
 		"preTest":     "ip netns add {{.NS}}",
 		"postTest":    "ip netns delete {{.NS}}",
-		"preEachEth":  `sh -c "ip link set {{.Eth}} netns {{.NS}} && ip netns exec {{.NS}} ip addr add {{.IP}}/24 dev {{.Eth}} && ip netns exec {{.NS}} ip link set {{.Eth}} up"`,
-		"postEachEth": "ip netns exec {{.NS}} ip link set {{.Eth}} netns 1",
+		"preEachEth1":  "ip link set dev {{.Eth}} netns {{.NS}}",
+		"preEachEth2": "ip netns exec {{.NS}} ip addr add {{.IP}}/24 dev {{.Eth}}",
+		"preEachEth3": "ip netns exec {{.NS}} ip link set dev {{.Eth}} up",
+		"postEachEth": "ip netns exec {{.NS}} ip link set dev {{.Eth}} netns 1",
 	}
 
 	for name, pattern := range patterns {
@@ -763,6 +765,7 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 	if len(eths) != 4 {
 		return PortsInfo{}, errors.New("количество портов не равно 4")
 	}
+
 	pairs := map[config.Ethernet]config.Ethernet{
 		eths[0]: eths[1],
 		eths[1]: eths[0],
@@ -772,27 +775,34 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 
 	// их перебор
 	result := make(chan int)
+	errList := make([]error, 0, 8)
 
 	for client, server := range pairs {
 		func() {
 			// перед запуском тестов на порту для каждого клиента
-			cmd.Reset()
-			if err = tmpls["preEachEth"].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name, IP: client.Ip}); err != nil {
-				logCh <- hw.LogMsg{
-					Level: hw.ERR,
-					Text:  err.Error(),
-					Stamp: time.Now(),
+			for _, actions := range []string{"preEachEth1","preEachEth2","preEachEth3"} {
+				cmd.Reset()
+				if err = tmpls[actions].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name, IP: client.Ip}); err != nil {
+					logCh <- hw.LogMsg{
+						Level: hw.ERR,
+						Text:  err.Error(),
+						Stamp: time.Now(),
+					}
+					errList = append(errList, fmt.Errorf("ошибка подготовки шаблона команды для порта-клиента %s %v", client.Name, err))
+					return 
 				}
-				return
-			}
-			if err = runCmd(cmd.String()); err != nil {
-				logCh <- hw.LogMsg{
-					Level: hw.ERR,
-					Text:  err.Error(),
-					Stamp: time.Now(),
+				if err = runCmd(cmd.String()); err != nil {
+					logCh <- hw.LogMsg{
+						Level: hw.ERR,
+						Text:  err.Error(),
+						Stamp: time.Now(),
+					}
+					errList = append(errList, fmt.Errorf("ошибка выполения пре-eth действий для порта клиента %s %v команда: %s", client.Name, err, cmd.String()))
+					return 
 				}
-				return
 			}
+			
+			// Тут надо что-то сделать, чтобы в итоговой таблице пользователь мог видеть, что не так
 			// в конце каждого теста
 			defer func() {
 				cmd.Reset()
