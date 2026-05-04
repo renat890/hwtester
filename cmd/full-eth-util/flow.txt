@@ -1,0 +1,11 @@
+Сначала выполняю команды:
+sudo ip netns add testns
+sudo ip link set enp1s0 netns testns
+sudo ip netns exec testns ip addr add 200.200.200.201/24 dev enp1s0
+sudo ip netns exec testns ip link set enp1s0 up
+sudo ip addr add 200.200.200.202/24 dev enp2s0
+Потом запускаю команду в 1 терминале:
+sudo ./eth-util --ip=200.200.200.202
+И запускаю команду во 2 терминале:
+sudo ip netns exec testns ./eth-util --mode=client --ip=200.200.200.202
+Код утилиты eth-util тут

@@ -36,14 +36,6 @@ func mustConf(path string) *Config {
 
 func main() {
 	log.Println("Добро пожаловать в утилиту тестирования COM-портов!")
-	// log.Println("Сканирование доступных портов в системе:")
-	// ports, err := serial.GetPortsList()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// for _, port := range ports {
-	// 	log.Printf("Найден порт: %v\n", port)
-	// }
 
 	var portOne, portTwo, path string
 	flag.StringVar(&portOne, "first", "/dev/ttyS0", "first com port for testing")
@@ -66,33 +58,90 @@ func main() {
 		}
 	}
 
-	// log.Println("Валидация заданных портов для тестирования:")
-	// if !slices.Contains(ports, portOne) {
-	// 	log.Fatalf("❌ COM-порт %s отсутствует в системе", portOne)
-	// }
-	// if !slices.Contains(ports, portTwo) {
-	// 	log.Fatalf("❌ COM-порт %s отсутствует в системе", portTwo)
-	// }
-	// log.Println("✅ Порты валидны. Запуск теста")
-	// pairs := map[string]string{
-	// 	ports[0]: ports[1],
-	// 	ports[1]: ports[0],
-	// }
-	// pairs := map[string]string{
-	// 	portOne: portTwo,
-	// 	portTwo: portOne,
+	// lost := make(chan int)
+	// defer close(lost)
+
+	ctx, cancel := context.WithTimeout(context.Background(), conf.Duration)
+	defer cancel()
+
+	numWorker := 1
+	for first, second := range pairs {
+		go testPair(ctx, first, second, numWorker)
+		numWorker++
+	}
+
+	<-ctx.Done()
+
+}
+
+func testPair(ctx context.Context, first, second string, numWorker int) {
+	log.Printf("Запущен воркер тестирования пары %s - %s с номером %d\n", first, second, numWorker)
+
+	pairs := map[string]string{
+		first:  second,
+		second: first,
+	}
+
+	for {
+		if ctx.Err() != nil {
+			log.Printf("ОСТАНОВЛЕН воркер тестирования пары %s - %s с номером %d\n", first, second, numWorker)
+			return
+		}
+		var testsAttempt = 3
+		var wg sync.WaitGroup
+		var tests bool
+		result := make(chan bool, 1)
+		defer close(result)
+
+		for i := range testsAttempt {
+			tests = true
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+
+			log.Printf("%d попытка прохождения теста с COM-портами\n", i+1)
+			for rPort, wPort := range pairs {
+				log.Printf("Тестирование пары rPort %s, wPort %s\n", rPort, wPort)
+				wg.Add(2)
+				go func(r string) {
+					defer wg.Done()
+					// b := portRead(ctx, r, result)
+				}(rPort)
+				go func(w string) {
+					defer wg.Done()
+					portWrite(ctx, w)
+				}(wPort)
+				wg.Wait()
+
+				res, ok := <-result
+				if !ok || !res {
+					tests = false
+				}
+			}
+			cancel()
+			if tests {
+				break
+			} else {
+				log.Println("❌ Неудачная попытка прохождения теста. Перезапускаю тест.")
+			}
+
+		}
+	}
+
+	var testsAttempt = 3
+
+	// for i := range testsAttempt {
+
 	// }
 
 	var wg sync.WaitGroup
-	result := make(chan testResult, 1)
+	result := make(chan bool, 1)
 	defer close(result)
 
 	var tests bool
-	testsAttempt := 3
+	// testsAttempt := 3
 
 	for i := range testsAttempt {
 		tests = true
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 
 		log.Printf("%d попытка прохождения теста с COM-портами\n", i+1)
 		for rPort, wPort := range pairs {
@@ -109,7 +158,7 @@ func main() {
 			wg.Wait()
 
 			res, ok := <-result
-			if !ok || !res.state {
+			if !ok || !res {
 				tests = false
 			}
 		}
@@ -120,40 +169,28 @@ func main() {
 			log.Println("❌ Неудачная попытка прохождения теста. Перезапускаю тест.")
 		}
 	}
-
-	if tests {
-		log.Println("✅ Тест пройден")
-	} else {
-		log.Println("❌ Тест не пройден")
-	}
-
 }
 
-type testResult struct {
-	state bool
-	str   string
-}
-
-func portRead(ctx context.Context, name string, ch chan testResult) {
+func portRead(ctx context.Context, name string, ch chan bool) {
 	port, err := serial.Open(name, &serial.Mode{
 		BaudRate: 115200,
 	})
 	if err != nil {
 		log.Println(err)
-		ch <- testResult{state: false, str: "Ошибка открытия COM-порта"}
+		ch <- false
 		return
 	}
 	defer port.Close()
 
 	if err := port.SetReadTimeout(500 * time.Millisecond); err != nil {
 		log.Println(err)
-		ch <- testResult{state: false, str: "Ошибка установки таймаута чтения"}
+		ch <- false
 		return
 	}
 
 	if err := port.ResetInputBuffer(); err != nil {
 		log.Println(err)
-		ch <- testResult{state: false, str: "Ошибка сброса буфера ввода"}
+		ch <- false
 		return
 	}
 
@@ -165,7 +202,7 @@ reader:
 	for {
 		select {
 		case <-ctx.Done():
-			ch <- testResult{state: false, str: "Таймаут чтения"}
+			ch <- false
 			return
 		default:
 			n, err := port.Read(buf)
@@ -178,15 +215,16 @@ reader:
 			}
 			// log.Printf("Получено сообщение #%d: %s\n",numMsg, string(buf[:n]))
 			final.WriteString(string(buf[:n]))
+
 			if strings.Contains(final.String(), "stop") {
 				break reader
 			}
 		}
 	}
 	if msg == final.String() {
-		ch <- testResult{state: true, str: ""}
+		ch <- true
 	} else {
-		ch <- testResult{state: false, str: final.String()}
+		ch <- false
 	}
 }
 

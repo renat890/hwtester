@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -13,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const msg = "test com this big message and very big message abracodabra stop"
+const msg = "stop"
 
 type Config struct {
 	Ports    []string      `yaml:"ports"`
@@ -36,72 +38,77 @@ func mustConf(path string) *Config {
 
 func main() {
 	log.Println("Добро пожаловать в утилиту тестирования COM-портов!")
-	// log.Println("Сканирование доступных портов в системе:")
-	// ports, err := serial.GetPortsList()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// for _, port := range ports {
-	// 	log.Printf("Найден порт: %v\n", port)
-	// }
 
-	var portOne, portTwo, path string
+	var portOne, portTwo, durationStr string
 	flag.StringVar(&portOne, "first", "/dev/ttyS0", "first com port for testing")
 	flag.StringVar(&portTwo, "second", "/dev/ttyS1", "second com port for testing")
-	flag.StringVar(&path, "path", "", "path to config.yml with settings")
+	flag.StringVar(&durationStr, "duration", "10s", "test duration")
 
 	flag.Parse()
 
-	conf := mustConf(path)
-
-	if len(conf.Ports)%2 != 0 {
-		log.Fatal("Количество портов должно быть чётным!")
+	duration, err := time.ParseDuration(durationStr)
+	if err != nil {
+		log.Fatalf("Не удалось преобразовать длительность тестов %s : %s", durationStr, err.Error())
 	}
 
-	pairs := map[string]string{}
-	for i := range len(conf.Ports) {
-		if i%2 == 0 {
-			pairs[conf.Ports[i]] = conf.Ports[i+1]
-			pairs[conf.Ports[i+1]] = conf.Ports[i]
+	logname := fmt.Sprintf("com_test_log_%s.json", time.Now().Format("20060102_150405000"))
+	fileLog, err := os.OpenFile(logname, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatalf("Не удалось открыть файл для логирования %s", err.Error())
+	}
+	defer fileLog.Close()
+
+	logger := slog.New(slog.NewJSONHandler(fileLog, nil))
+
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
+
+	go testPair(ctx, portOne, portTwo, logger)
+
+	<-ctx.Done()
+
+}
+
+type testResult struct {
+	state bool
+	str   string
+}
+
+func testPair(ctx context.Context, first, second string, logger *slog.Logger) {
+	pairs := map[string]string{
+		first:  second,
+		second: first,
+	}
+
+	iterNum := 1
+	log.Printf("ЗАПУЩЕН воркер тестирования пары %s - %s\n", first, second)
+	const sleppTime = 500 * time.Millisecond
+
+	for {
+		if ctx.Err() != nil {
+			log.Printf("ОСТАНОВЛЕН воркер тестирования пары %s - %s\n", first, second)
+			return
 		}
-	}
 
-	// log.Println("Валидация заданных портов для тестирования:")
-	// if !slices.Contains(ports, portOne) {
-	// 	log.Fatalf("❌ COM-порт %s отсутствует в системе", portOne)
-	// }
-	// if !slices.Contains(ports, portTwo) {
-	// 	log.Fatalf("❌ COM-порт %s отсутствует в системе", portTwo)
-	// }
-	// log.Println("✅ Порты валидны. Запуск теста")
-	// pairs := map[string]string{
-	// 	ports[0]: ports[1],
-	// 	ports[1]: ports[0],
-	// }
-	// pairs := map[string]string{
-	// 	portOne: portTwo,
-	// 	portTwo: portOne,
-	// }
+		var wg sync.WaitGroup
+		var tests bool
+		result := make(chan testResult, 1)
+		defer close(result)
 
-	var wg sync.WaitGroup
-	result := make(chan testResult, 1)
-	defer close(result)
-
-	var tests bool
-	testsAttempt := 3
-
-	for i := range testsAttempt {
 		tests = true
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 
-		log.Printf("%d попытка прохождения теста с COM-портами\n", i+1)
+		// log.Printf("%d попытка прохождения теста с COM-портами\n", iterNum)
+		iterNum++
+
 		for rPort, wPort := range pairs {
-			log.Printf("Тестирование пары rPort %s, wPort %s\n", rPort, wPort)
+			// log.Printf("Тестирование пары rPort %s, wPort %s\n", rPort, wPort)
 			wg.Add(2)
 			go func(r string) {
 				defer wg.Done()
 				portRead(ctx, r, result)
 			}(rPort)
+			time.Sleep(sleppTime)
 			go func(w string) {
 				defer wg.Done()
 				portWrite(ctx, w)
@@ -112,26 +119,17 @@ func main() {
 			if !ok || !res.state {
 				tests = false
 			}
+
+			logger.Info("Результат тестирования пары COM-портов",
+				"first_port", first,
+				"second_port", second,
+				"test_passed", tests,
+				"iteration", iterNum-1,
+				"result_str", res.str,
+			)
 		}
 		cancel()
-		if tests {
-			break
-		} else {
-			log.Println("❌ Неудачная попытка прохождения теста. Перезапускаю тест.")
-		}
 	}
-
-	if tests {
-		log.Println("✅ Тест пройден")
-	} else {
-		log.Println("❌ Тест не пройден")
-	}
-
-}
-
-type testResult struct {
-	state bool
-	str   string
 }
 
 func portRead(ctx context.Context, name string, ch chan testResult) {
@@ -178,6 +176,7 @@ reader:
 			}
 			// log.Printf("Получено сообщение #%d: %s\n",numMsg, string(buf[:n]))
 			final.WriteString(string(buf[:n]))
+
 			if strings.Contains(final.String(), "stop") {
 				break reader
 			}

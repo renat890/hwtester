@@ -1,0 +1,6 @@
+ports:
+  - /dev/ttyXR0
+  - /dev/ttyXR1
+  - /dev/ttyXR2
+  - /dev/ttyXR3
+duration: 10s
