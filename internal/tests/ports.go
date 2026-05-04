@@ -139,6 +139,8 @@ func (e *EthernetsTest) Run(ctx context.Context, logCh chan hw.LogMsg) (result h
 		}
 	}
 
+	result.Metrics["Потеряные пакеты"] = ethernetsInfo.PacketsLoss
+
 	return result
 }
 

@@ -82,9 +82,10 @@ func (r *ROM) Run(ctx context.Context, logCh chan hw.LogMsg) (result hw.TestResu
 
 	for _, disk := range actualDisks {
 		key := fmt.Sprintf("Скорость чтения диска %s в MБ/c", disk.Name)
-		result.Metrics[key] = disk.ReadMBPerSec 
+		result.Metrics[key] = disk.ReadMBPerSec
+		key = fmt.Sprintf("Скорость записи диска %s в MБ/c", disk.Name)
+		result.Metrics[key] = disk.WriteMBPerSec
 	}
-
 
 	return result
 }

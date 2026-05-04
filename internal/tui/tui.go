@@ -62,8 +62,8 @@ type Model struct {
 	spin           spinner.Model
 	version        string
 	width          int
-	height int
-	prog progress.Model
+	height         int
+	prog           progress.Model
 
 	tests []hw.HWTest
 }
@@ -80,7 +80,7 @@ func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest, version
 			spinner.WithStyle(spinnerStyle),
 		),
 		prog: progress.New(
-			progress.WithScaled(true), 
+			progress.WithScaled(true),
 			progress.WithColors(lipgloss.Green),
 			progress.WithFillCharacters('█', '░'),
 			progress.WithoutPercentage(),
@@ -99,7 +99,7 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// TODO: сделать зависимой от размера экрана
-	const logsSize = 20
+	const logsSize = 40
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -178,6 +178,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case AllDoneMsg:
 		m.currentScreen = resultScreen
+		// time.Sleep(30 * time.Second) // УДАЛИТЬ!
 		// остановка спиннера
 		m.spin = spinner.New()
 		m.final = msg.Final
@@ -195,8 +196,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) View() tea.View {
 	s := strings.Builder{}
 
-	leftColWidth := m.width / 3 - 2 * padding
-	rightColWidth :=  m.width - leftColWidth - 2 * padding 
+	leftColWidth := m.width/3 - 2*padding
+	rightColWidth := m.width - leftColWidth - 2*padding
 
 	switch m.currentScreen {
 	case startScreen:
@@ -238,13 +239,13 @@ func (m Model) View() tea.View {
 		// TODO: подумать с шириной левого блока, пока константа
 		currentTest := m.tests[m.currentTestIdx].Name()
 		left := currentTestsPanel(m.results, len(m.tests), currentTest, m.spin.View(), leftColWidth, lipgloss.Height(right))
-		
+
 		s.WriteString(lipgloss.JoinVertical(
 			lipgloss.Left,
 			title,
 			progressBar,
 			lipgloss.JoinHorizontal(lipgloss.Top, left, right)),
-		) 
+		)
 	case resultScreen:
 		s.Reset()
 		title := headStyle.Render(fmt.Sprintf("УТИЛИТА ТЕСТИРОВАНИЯ 68ХХ %s 68XX · s/n 00000 Завершено: 01-01-1970 00:00:00 Длительность: 00:00", m.version))
@@ -264,7 +265,6 @@ func (m Model) View() tea.View {
 
 	return v
 }
-
 
 func (m Model) waitForResult(ch chan hw.TestResult) tea.Cmd {
 	return func() tea.Msg {

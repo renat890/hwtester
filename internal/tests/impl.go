@@ -24,6 +24,7 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/sensors"
 	"go.bug.st/serial"
+	"golang.org/x/sys/unix"
 )
 
 var ErrSensorsNotFound = errors.New("датчики температуры coretemp не найдены")
@@ -154,40 +155,68 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 
 func (h *HardwareUsage) checkSpeedDisks(name string) (diskSpeed, error) {
 	rdName := "/dev/" + name
-	fd, err := syscall.Open(rdName, syscall.O_RDONLY|syscall.O_SYNC, 0)
+	fd, err := syscall.Open(rdName, syscall.O_RDONLY|syscall.O_DIRECT, 0)
 	if err != nil {
 		return diskSpeed{}, fmt.Errorf("Не удалось открыть дескриптор диска для чтения %v", err)
 	}
 	defer syscall.Close(fd)
-	buf := make([]byte, 32*1024)
+
+	bufUnix, err := unix.Mmap(
+		-1,
+		0,
+		32*128*1024, // 4 МБ
+		unix.PROT_READ|unix.PROT_WRITE,
+		unix.MAP_ANON|unix.MAP_PRIVATE,
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer unix.Munmap(bufUnix)
 
 	sum := 0
+	offset := 0
 	start := time.Now()
-	for {
-		if sum >= 512_000_000 {
+	// for {
+	// 	if sum >= 512_000_000 {
+	// 		break
+	// 	}
+	// 	n, err := syscall.Read(fd, bufUnix)
+	// 	if err != nil {
+	// 		return diskSpeed{}, fmt.Errorf("Не удалось проверить запись в сетевой дескриптор для чтения %v", err)
+	// 	}
+	// 	sum += n
+	// }
+
+	for sum < 2_048_000_000 {
+		n, err := syscall.Pread(fd, bufUnix, int64(offset))
+		if err != nil {
+			return diskSpeed{}, err
+		}
+		if n == 0 {
 			break
 		}
-		n, err := syscall.Read(fd, buf)
-		if err != nil {
-			return diskSpeed{}, fmt.Errorf("Не удалось проверить запись в сетевой дескриптор для чтения %v", err)
-		}
 		sum += n
+		offset += n
 	}
+
 	end := time.Since(start).Nanoseconds()
 	readSpeed := toMbPerSec(sum, end)
 
 	wrtName := rdName
 	const (
 		nvmeSuf = "p77"
-		scsiSuf = "77"
+		scsiSuf = "77" // ЭТО ОЧЕНЬ ОПАСНЫЙ МОМЕНТ, МОЖЕТ ПРИВЕСТИ К ПОТЕРЕ ДАННЫХ,
+		// БУДЬТЕ ОСТОРОЖНЫ И УБЕДИТЕСЬ ЧТО ВАШ ДИСК НЕ СОДЕРЖИТ ВАЖНЫХ ДАННЫХ
 	)
 	if strings.HasPrefix(name, "nvme") {
 		wrtName += nvmeSuf
 	} else {
 		wrtName += scsiSuf
 	}
+
 	var writeSpeed float64
-	fdWrt, err := syscall.Open(wrtName, syscall.O_WRONLY|syscall.O_DIRECT, 0)
+	fdWrt, err := syscall.Open(wrtName, syscall.O_WRONLY|syscall.O_DIRECT, 0) // |
+	// fdWrt, err := syscall.Open("/test_dir/testfile.txt", syscall.O_DIRECT|syscall.O_WRONLY|syscall.O_CREAT, 0644)
 	if err != nil {
 		writeSpeed = 0.0
 	} else {
@@ -195,12 +224,12 @@ func (h *HardwareUsage) checkSpeedDisks(name string) (diskSpeed, error) {
 		sum = 0
 		start = time.Now()
 		for {
-			if sum >= 512_000_000 {
+			if sum >= 2_048_000_000 {
 				break
 			}
-			n, err := syscall.Write(fdWrt, buf)
+			n, err := syscall.Write(fdWrt, bufUnix)
 			if err != nil {
-				return diskSpeed{}, fmt.Errorf("Не удалось проверить скорость записи в диск %v", err)
+				return diskSpeed{}, fmt.Errorf("Не удалось проверить скорость записи в диск '%s' ошибка %v", wrtName, err)
 			}
 			sum += n
 		}
@@ -689,12 +718,15 @@ const nameNetNamespace = "testns"
 func loadTemplates() (map[string]*template.Template, error) {
 	result := map[string]*template.Template{}
 	patterns := map[string]string{
-		"preTest":     "ip netns add {{.NS}}",
-		"postTest":    "ip netns delete {{.NS}}",
-		"preEachEth1":  "ip link set dev {{.Eth}} netns {{.NS}}",
-		"preEachEth2": "ip netns exec {{.NS}} ip addr add {{.IP}}/24 dev {{.Eth}}",
-		"preEachEth3": "ip netns exec {{.NS}} ip link set dev {{.Eth}} up",
-		"postEachEth": "ip netns exec {{.NS}} ip link set dev {{.Eth}} netns 1",
+		"preTest":       "ip netns add {{.NS}}",
+		"postTest":      "ip netns delete {{.NS}}",
+		"preEachEth1":   "ip link set dev {{.Eth}} netns {{.NS}}",
+		"preEachEth2":   "ip netns exec {{.NS}} ip addr add {{.IP}}/24 dev {{.Eth}}",
+		"preEachEth3":   "ip netns exec {{.NS}} ip link set dev {{.Eth}} up",
+		"preServerEth1": "ip addr add {{.IP}}/24 dev {{.Eth}}",
+		"preServerEth2": "ip link set dev {{.Eth}} up",
+		"postEachEth":   "ip netns exec {{.NS}} ip link set dev {{.Eth}} netns 1",
+		"postServerEth": "ip addr del {{.IP}}/24 dev {{.Eth}}",
 	}
 
 	for name, pattern := range patterns {
@@ -749,7 +781,7 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 		return PortsInfo{}, fmt.Errorf("ошибка выполнения пре-теста %v %s", err, cmd.String())
 	}
 
-	defer func ()  {
+	defer func() {
 		// выполняю действия после тестов сетевых интерфейсов
 		var lastCmd strings.Builder
 		err = tmpls["postTest"].Execute(&lastCmd, args{NS: nameNetNamespace})
@@ -762,26 +794,41 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 	}()
 
 	// создание пар портов
-	if len(eths) != 4 {
-		return PortsInfo{}, errors.New("количество портов не равно 4")
-	}
+	// if len(eths) != 4 {
+	// 	return PortsInfo{}, errors.New("количество портов не равно 4")
+	// }
 
 	pairs := map[config.Ethernet]config.Ethernet{
 		eths[0]: eths[1],
 		eths[1]: eths[0],
-		eths[2]: eths[3],
-		eths[3]: eths[2],
+		// eths[2]: eths[3],
+		// eths[3]: eths[2],
 	}
 
 	// их перебор
-	result := make(chan int)
+	result := make(chan int, 1) // Возможно, тут буфер лишний
 	errList := make([]error, 0, 8)
 
 	for client, server := range pairs {
 		func() {
 			// перед запуском тестов на порту для каждого клиента
-			for _, actions := range []string{"preEachEth1","preEachEth2","preEachEth3"} {
+			for _, actions := range []string{"preEachEth1", "preEachEth2", "preEachEth3"} {
 				cmd.Reset()
+				var text string
+				switch actions {
+				case "preEachEth1":
+					text = fmt.Sprintf("Перевожу порт %s с адресом %s в пространство %s", client.Name, client.Ip, nameNetNamespace)
+				case "preEachEth2":
+					text = fmt.Sprintf("Ставлю адрес %s для порта %s в пространстве %s", client.Ip, client.Name, nameNetNamespace)
+				case "preEachEth3":
+					text = fmt.Sprintf("Делаю статус UP для порта %s в пространстве %s", client.Name, nameNetNamespace)
+				}
+				logCh <- hw.LogMsg{
+					Level: hw.INFO,
+					Text:  text,
+					Stamp: time.Now(),
+				}
+
 				if err = tmpls[actions].Execute(&cmd, args{NS: nameNetNamespace, Eth: client.Name, IP: client.Ip}); err != nil {
 					logCh <- hw.LogMsg{
 						Level: hw.ERR,
@@ -789,7 +836,7 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 						Stamp: time.Now(),
 					}
 					errList = append(errList, fmt.Errorf("ошибка подготовки шаблона команды для порта-клиента %s %v", client.Name, err))
-					return 
+					return
 				}
 				if err = runCmd(cmd.String()); err != nil {
 					logCh <- hw.LogMsg{
@@ -798,10 +845,10 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 						Stamp: time.Now(),
 					}
 					errList = append(errList, fmt.Errorf("ошибка выполения пре-eth действий для порта клиента %s %v команда: %s", client.Name, err, cmd.String()))
-					return 
+					return
 				}
 			}
-			
+
 			// Тут надо что-то сделать, чтобы в итоговой таблице пользователь мог видеть, что не так
 			// в конце каждого теста
 			defer func() {
@@ -826,6 +873,57 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
+			logCh <- hw.LogMsg{
+				Level: hw.INFO,
+				Text:  fmt.Sprintf("Запуск сервера слушателя на порту %s с адресом %s", server.Name, server.Ip),
+				Stamp: time.Now(),
+			}
+			// настройка адреса порта сервера
+			func() {
+				cmd.Reset()
+				for _, action := range []string{"preServerEth1", "preServerEth2"} {
+					if err = tmpls[action].Execute(&cmd, args{Eth: server.Name, IP: server.Ip}); err != nil {
+						logCh <- hw.LogMsg{
+							Level: hw.ERR,
+							Text:  err.Error(),
+							Stamp: time.Now(),
+						}
+						errList = append(errList, err)
+						return
+					}
+					if err = runCmd(cmd.String()); err != nil {
+						logCh <- hw.LogMsg{
+							Level: hw.ERR,
+							Text:  err.Error(),
+							Stamp: time.Now(),
+						}
+						errList = append(errList, err)
+					}
+				}
+
+			}()
+
+			// после завершеня теста удалить адрес с серверного порта
+			defer func() {
+				var cmdLocal strings.Builder
+				if err = tmpls["postServerEth"].Execute(&cmdLocal, args{Eth: server.Name, IP: server.Ip}); err != nil {
+					logCh <- hw.LogMsg{
+						Level: hw.ERR,
+						Text:  err.Error(),
+						Stamp: time.Now(),
+					}
+					errList = append(errList, err)
+				}
+				if err = runCmd(cmdLocal.String()); err != nil {
+					logCh <- hw.LogMsg{
+						Level: hw.ERR,
+						Text:  err.Error(),
+						Stamp: time.Now(),
+					}
+					errList = append(errList, err)
+				}
+			}()
+
 			// сам тест портов
 			go listen(ctx, result, server.Ip, server.Port, logCh)
 			time.Sleep(500 * time.Millisecond)
@@ -838,8 +936,8 @@ func (h *HardwareUsage) GetEthernetsInfo(ctx context.Context, eths []config.Ethe
 					Text:  err.Error(),
 					Stamp: time.Now(),
 				}
-				errList = append(errList,fmt.Errorf("не удалось запустить клиента для порта %s", client.Name))
-				return 
+				errList = append(errList, fmt.Errorf("не удалось запустить клиента для порта %s", client.Name))
+				return
 			}
 
 			actual := <-result
@@ -877,7 +975,7 @@ func listen(ctx context.Context, result chan int, ip, port string, logCh chan hw
 	if err != nil {
 		logCh <- hw.LogMsg{
 			Level: hw.ERR,
-			Text:  err.Error(),
+			Text:  fmt.Errorf("ошибка прослушки порта на адресе %s : %v", address, err).Error(),
 			Stamp: time.Now(),
 		}
 		result <- 0
