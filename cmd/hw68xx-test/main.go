@@ -22,7 +22,7 @@ func main() {
 	if os.Getuid() != 0 {
 		log.Fatal("программа должна быть запущена с правами суперпользователя")
 	}
-	
+
 	cfgPath := flag.String("config", "./default.yml", "path to config file in .yml format")
 	flag.Parse()
 
@@ -31,6 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Не удалось загрузить конфигурацию: %s\n", err)
 	}
+
 	impl := tests.HardwareUsage{}
 	hwTests := []hw.HWTest{
 		tests.NewTestRAM(&impl, cfg.RAM.ValueMB),
@@ -42,18 +43,35 @@ func main() {
 	}
 
 	r := runner.NewTestRunner()
+
 	model := tui.NewModel(*cfg, r, hwTests, version)
 	modelR, errR := tea.NewProgram(model).Run()
 	if errR != nil {
 		log.Fatalf("не удалось корректно завершить программу: %v", errR)
 	}
 	model = modelR.(tui.Model)
+
 	// TODO: пока заглушка, в будущем должна программа создавать
 	meta := report.Meta{
 		Date:       time.Now(),
 		DeviceName: "68xx",
 		VersionOS:  "1",
 	}
+
+	// Генерация логов
+	logFile, err := os.OpenFile("logs.txt", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		log.Printf("не удалось открыть файл для записи %v", err)
+	}
+	defer logFile.Close()
+
+	for _, logMsg := range model.FullLogs() {
+		_, err = logFile.WriteString(fmt.Sprintf("%s: %s: %s\n", logMsg.Stamp.Format(time.RFC3339), logMsg.Level, logMsg.Text))
+		if err != nil {
+			log.Printf("не удалось записать данные в файл: %v", err)
+		}
+	}
+
 	rep := report.Generate(meta, model.Results())
 
 	htmlFile, err := os.OpenFile("report.html", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
@@ -74,7 +92,7 @@ func main() {
 			log.Printf("не удалось записать данные в файл: %v", err)
 		}
 	}
-	
+
 	if jsonFile != nil {
 		err = report.WriteJSON(jsonFile, rep)
 		if err != nil {

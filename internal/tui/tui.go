@@ -56,6 +56,7 @@ type Model struct {
 	cancel         context.CancelFunc
 	final          hw.Status
 	logs           []hw.LogMsg
+	fullLogs       []hw.LogMsg
 	logCh          chan hw.LogMsg
 	currentTest    string
 	currentTestIdx int
@@ -91,6 +92,10 @@ func NewModel(cfg config.Config, mRunner ModelRunner, tests []hw.HWTest, version
 
 func (m Model) Results() []hw.TestResult {
 	return m.results
+}
+
+func (m Model) FullLogs() []hw.LogMsg {
+	return m.fullLogs
 }
 
 func (m Model) Init() tea.Cmd {
@@ -163,6 +168,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.waitForResult(m.ch)
 	case hw.LogMsg:
 		m.logs = append(m.logs, msg)
+		m.fullLogs = append(m.fullLogs, msg)
 		// тут перестроение буфера для логов
 		if tmp := len(m.logs); tmp > logsSize {
 			m.logs = m.logs[tmp-logsSize:]
@@ -171,6 +177,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case LastLogMsg:
 		last := hw.LogMsg{Level: hw.INFO, Text: string(msg), Stamp: time.Now()}
 		m.logs = append(m.logs, last)
+		m.fullLogs = append(m.fullLogs, last)
 		// тут перестроение буфера для логов
 		if tmp := len(m.logs); tmp > logsSize {
 			m.logs = m.logs[tmp-logsSize:]
