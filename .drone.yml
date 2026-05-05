@@ -1,0 +1,12 @@
+kind: pipeline
+type: docker
+name: default
+
+# clone:
+#   disable: true // отключаем клонирование репозитория, так как он не нужен для сборки
+
+steps:
+  - name: list files
+    image: alpine
+    commands:
+      - ls -la
