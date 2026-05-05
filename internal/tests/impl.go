@@ -94,6 +94,11 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 				Name:     info.Name,
 				VolumeMB: bytesToMBytes(info.Size),
 			})
+			logCh <- hw.LogMsg{
+				Level: hw.INFO,
+				Text:  fmt.Sprintf("Найден диск %s, объем %d MB", info.Name, bytesToMBytes(info.Size)),
+				Stamp: time.Now(),
+			}
 		}
 
 	}
@@ -115,6 +120,11 @@ func (h *HardwareUsage) Info(logCh chan hw.LogMsg) ([]DiskInfo, error) {
 			if err != nil {
 				chErr <- fmt.Errorf("Ошибка при проверки скорости диска %v", err)
 				return
+			}
+			logCh <- hw.LogMsg{
+				Level: hw.INFO,
+				Text:  fmt.Sprintf("Закончено измерение скорости диска %s, чтение - %v MB/s, запись - %v MB/s", disk.Name, speeds.read, speeds.write),
+				Stamp: time.Now(),
 			}
 			ch <- speeds
 		}(disk.Name)
@@ -176,16 +186,6 @@ func (h *HardwareUsage) checkSpeedDisks(name string) (diskSpeed, error) {
 	sum := 0
 	offset := 0
 	start := time.Now()
-	// for {
-	// 	if sum >= 512_000_000 {
-	// 		break
-	// 	}
-	// 	n, err := syscall.Read(fd, bufUnix)
-	// 	if err != nil {
-	// 		return diskSpeed{}, fmt.Errorf("Не удалось проверить запись в сетевой дескриптор для чтения %v", err)
-	// 	}
-	// 	sum += n
-	// }
 
 	for sum < 2_048_000_000 {
 		n, err := syscall.Pread(fd, bufUnix, int64(offset))
